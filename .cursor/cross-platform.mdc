@@ -1,0 +1,358 @@
+---
+description: Cross-Platform Development Standards for TacticoAI
+alwaysApply: false
+---
+
+# Cross-Platform Development Standards
+
+## 🖥️ Platform Compatibility Requirements
+
+### **Supported Platforms**
+- **Windows**: Windows 10/11 with PowerShell/CMD
+- **macOS**: macOS 10.15+ with Terminal
+- **Linux**: Ubuntu 20.04+ and similar distributions
+
+### **Development Environment Standards**
+- **Python**: 3.12 REQUIRED (not 3.13 - PyTorch CUDA incompatibility)
+- **PyTorch**: 2.5.x with CUDA 12.4 for GPU acceleration
+- **Node.js**: 18+ with npm/yarn
+- **FFmpeg**: System-wide installation required
+- **NVIDIA GPU**: Optional but highly recommended (10-50x faster video analysis)
+- **Git**: Latest version for all platforms
+
+## 🐍 Python Backend Cross-Platform Standards
+
+### **Path Handling (CRITICAL)**
+```python
+import os
+from pathlib import Path
+
+# ✅ CORRECT: Use os.path.join() for all file operations
+video_path = os.path.join("video_storage", team_id, match_id, "combined_video.mp4")
+chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
+
+# ✅ CORRECT: Use os.path.abspath() for absolute paths
+absolute_path = os.path.abspath(relative_path)
+
+# ❌ WRONG: Hardcoded path separators
+video_path = f"video_storage/{team_id}/{match_id}/combined_video.mp4"  # Unix only
+video_path = f"video_storage\\{team_id}\\{match_id}\\combined_video.mp4"  # Windows only
+```
+
+### **Executable Detection**
+```python
+import shutil
+import os
+
+def _find_ffmpeg(self) -> str:
+    """Find FFmpeg executable across all platforms"""
+    # Check PATH first
+    ffmpeg_path = shutil.which('ffmpeg')
+    if ffmpeg_path:
+        return ffmpeg_path
+
+    # Platform-specific locations
+    if os.name == 'nt':  # Windows
+        locations = [
+            'ffmpeg.exe',  # In PATH
+            r'C:\ffmpeg\bin\ffmpeg.exe',
+            r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
+            r'C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe'
+        ]
+    else:  # Unix-like (macOS, Linux)
+        locations = [
+            'ffmpeg',  # In PATH
+            '/usr/local/bin/ffmpeg',
+            '/opt/homebrew/bin/ffmpeg',  # macOS Homebrew
+            '/usr/bin/ffmpeg',
+            '/bin/ffmpeg'
+        ]
+
+    for location in locations:
+        if shutil.which(location):
+            return location
+
+    raise Exception("FFmpeg not found! Please install FFmpeg...")
+```
+
+### **Environment Variable Handling**
+```python
+import os
+
+# ✅ CORRECT: Cross-platform environment handling
+def _run_video_analysis(self, video_path: str) -> dict:
+    env = os.environ.copy()
+
+    # Set PYTHONPATH for module discovery
+    if 'PYTHONPATH' in env:
+        if os.name == 'nt':  # Windows
+            env['PYTHONPATH'] = f"{VIDEO_ANALYSIS_PATH};{env['PYTHONPATH']}"
+        else:  # Unix-like (macOS, Linux)
+            env['PYTHONPATH'] = f"{VIDEO_ANALYSIS_PATH}:{env['PYTHONPATH']}"
+    else:
+        env['PYTHONPATH'] = VIDEO_ANALYSIS_PATH
+
+    # Run subprocess with proper environment
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        cwd=VIDEO_ANALYSIS_PATH,
+        env=env
+    )
+```
+
+### **File Extension Handling**
+```python
+# ✅ CORRECT: Ensure proper file extensions
+def combine_local_chunks(self, team_id: str, match_id: str, num_chunks: int) -> str:
+    chunk_paths = []
+    for i in range(num_chunks):
+        # Always include .mp4 extension for video chunks
+        chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
+        chunk_path = self._normalize_path(chunk_path)
+        chunk_paths.append(chunk_path)
+```
+
+### **Virtual Environment Standards**
+```python
+# ✅ CORRECT: Platform-specific virtual environment activation
+def get_activation_command():
+    if os.name == 'nt':  # Windows
+        return r"venv\Scripts\activate"
+    else:  # Unix-like
+        return "source venv/bin/activate"
+```
+
+## 🌐 Frontend Cross-Platform Standards
+
+### **File Upload Handling**
+```typescript
+// ✅ CORRECT: Ensure proper file extensions in uploads
+const uploadVideoChunk = async (chunk: Blob, chunkIndex: number, matchId: string) => {
+  const formData = new FormData();
+  // Always include .mp4 extension for backend compatibility
+  formData.append('file', chunk, `chunk_${chunkIndex}.mp4`);
+
+  const response = await fetch(`/api/upload/video-chunk`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'X-Match-ID': matchId,
+      'X-Chunk-Index': chunkIndex.toString(),
+    },
+  });
+};
+```
+
+### **Environment Variables**
+```typescript
+// ✅ CORRECT: Use Vite environment variables
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+```
+
+### **Build Configuration**
+```typescript
+// vite.config.ts - Cross-platform build settings
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  build: {
+    // Ensure consistent builds across platforms
+    target: 'esnext',
+    minify: 'esbuild',
+  },
+  server: {
+    // Cross-platform dev server settings
+    host: true,
+    port: 5173,
+  },
+});
+```
+
+## 📦 Dependency Management
+
+### **Python Dependencies (requirements.txt)**
+```txt
+# ✅ CORRECT: Pin specific versions for Python 3.12 compatibility
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+supabase==2.10.0
+python-multipart==0.0.20
+httpx==0.27.2
+python-dotenv==1.0.0
+
+# Video processing
+opencv-python==4.12.0.88
+supervision==0.26.1
+ultralytics==8.3.217
+
+# AI/ML dependencies - CRITICAL: Install PyTorch FIRST with CUDA
+# Run this BEFORE requirements.txt:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+numpy>=1.26.0
+umap-learn>=0.5.5
+scikit-learn>=1.4.0
+transformers>=4.40.0
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+numba>=0.59.0
+
+# Additional utilities
+requests==2.31.0
+```
+
+### **Node.js Dependencies (package.json)**
+```json
+{
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^6.3.5"
+  }
+}
+```
+
+## 🔧 Development Setup Commands
+
+### **Windows (PowerShell/CMD)**
+```powershell
+# Backend setup
+cd backend
+
+# Create venv with Python 3.12 (CRITICAL)
+py -3.12 -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# Verify Python version
+python --version  # Should show Python 3.12.x
+
+# Install PyTorch with CUDA FIRST (if you have NVIDIA GPU)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Then install other dependencies
+pip install -r requirements.txt
+
+# Verify CUDA works
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+
+# Run backend
+uvicorn main:app --reload
+
+# Frontend setup (new terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+### **macOS/Linux (Terminal)**
+```bash
+# Backend setup
+cd backend
+
+# Create venv with Python 3.12 (CRITICAL)
+python3.12 -m venv venv
+source venv/bin/activate
+
+# Verify Python version
+python --version  # Should show Python 3.12.x
+
+# Install PyTorch with CUDA FIRST (if you have NVIDIA GPU)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Then install other dependencies
+pip install -r requirements.txt
+
+# Verify CUDA works (if applicable)
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+
+# Run backend
+uvicorn main:app --reload
+
+# Frontend setup (new terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+## 🚨 Common Cross-Platform Issues & Solutions
+
+### **Issue 1: Path Separators**
+```python
+# ❌ WRONG: Hardcoded separators
+path = "video_storage/team_id/match_id/video.mp4"  # Unix only
+
+# ✅ CORRECT: Use os.path.join()
+path = os.path.join("video_storage", "team_id", "match_id", "video.mp4")
+```
+
+### **Issue 2: FFmpeg Not Found**
+```python
+# ❌ WRONG: Assumes FFmpeg in PATH
+subprocess.run(['ffmpeg', '-i', input_file, output_file])
+
+# ✅ CORRECT: Find FFmpeg dynamically
+ffmpeg_path = self._find_ffmpeg()
+subprocess.run([ffmpeg_path, '-i', input_file, output_file])
+```
+
+### **Issue 3: Module Import Errors**
+```python
+# ❌ WRONG: Assumes module in Python path
+import sports.ball
+
+# ✅ CORRECT: Set PYTHONPATH in subprocess
+env = os.environ.copy()
+env['PYTHONPATH'] = VIDEO_ANALYSIS_PATH
+subprocess.run(cmd, env=env)
+```
+
+### **Issue 4: File Extension Mismatches**
+```typescript
+// ❌ WRONG: Missing file extension
+formData.append('file', chunk, `chunk_${chunkIndex}`);
+
+// ✅ CORRECT: Include proper extension
+formData.append('file', chunk, `chunk_${chunkIndex}.mp4`);
+```
+
+## 📋 Testing Checklist
+
+### **Cross-Platform Testing Requirements**
+- [ ] **Windows**: Test on Windows 10/11 with PowerShell
+- [ ] **macOS**: Test on macOS with Terminal
+- [ ] **Linux**: Test on Ubuntu 20.04+
+- [ ] **FFmpeg**: Verify FFmpeg detection on all platforms
+- [ ] **Virtual Environment**: Test venv activation on all platforms
+- [ ] **File Upload**: Test chunked upload with proper extensions
+- [ ] **Path Handling**: Verify all file operations use os.path.join()
+- [ ] **Environment Variables**: Test PYTHONPATH handling
+- [ ] **Dependencies**: Verify all packages install correctly
+- [ ] **Build Process**: Test production builds on all platforms
+
+## 🎯 Best Practices Summary
+
+1. **Always use `os.path.join()` for file paths**
+2. **Implement robust executable detection**
+3. **Handle environment variables properly**
+4. **Pin dependency versions**
+5. **Test on all target platforms**
+6. **Use virtual environments**
+7. **Include proper file extensions**
+8. **Document platform-specific setup steps**
+9. **Handle path separators correctly**
+10. **Set PYTHONPATH in subprocess calls**

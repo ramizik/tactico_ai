@@ -1,0 +1,169 @@
+---
+alwaysApply: true
+---
+
+# TacticoAI - AI Tactical Sports Analyst MVP
+
+## Project Overview
+- **Mission**: AI-powered post-game tactical analysis for college soccer teams
+- **Timeline**: 48-hour Cal Hacks 12 hackathon MVP
+- **Target**: End-to-end demo in ≤5 min (upload → CV analysis → LLM summary → voice Q&A)
+
+## Tech Stack
+- **Frontend**: React + Vite + Tailwind CSS + React Router + React Query + Zustand
+- **Backend**: FastAPI (thin API layer)
+- **Worker**: Python 3.12 + OpenCV + YOLOv8 (tiny) + ByteTrack/DeepSORT
+- **AI/ML**: PyTorch 2.5.x (CUDA 12.4), Ultralytics YOLOv8, Transformers (SigLIP)
+- **AI/LLM**: Letta (Sonnet 4.5) for RAG + tactical summaries
+- **Voice**: Vapi widget for conversational coach assistant
+- **Database**: Supabase (Auth + Postgres + Storage + Realtime)
+- **Deployment**: Vercel (web) + Railway/Render (API/worker)
+
+## Architecture Pattern
+- **Async job queue**: Postgres `jobs` table (status: queued → running → completed/failed)
+- **Data flow**: Upload video → Supabase Storage → Worker CV pipeline → Letta RAG → Analysis JSON → Frontend
+
+## Key Constraints
+- **Speed over perfection**: 5 FPS sampling, YOLO tiny, 60-120s clips for live demo
+- **MVP sports**: Soccer only
+- **Hackathon-optimized**: Pre-baked demo matches, graceful degradation, fail-safes
+- **Production-ready features**: Implement fully working features with real data integration
+- **No mock data**: Use actual API calls, real database connections, and live services
+- **No test files**: Focus on working code, provide manual testing instructions instead
+
+## Code Standards
+- **TypeScript/Python**: Type hints required for all function parameters
+- **Error handling**: Always wrap external API calls (Supabase, Letta, Vapi) in try-catch with user-facing error messages
+- **Async patterns**: Use React Query for data fetching; FastAPI async/await for I/O
+- **File naming**: kebab-case for components (`past-match-card.tsx`), snake_case for Python (`worker.py`)
+- **Git flow**: Feature branches → PR to main → auto-deploy on merge
+
+## Python Version & Dependencies (CRITICAL)
+- **Python Version**: 3.12 REQUIRED (not 3.13!)
+  - Python 3.13 lacks PyTorch CUDA support
+  - Use `py -3.12 -m venv venv` (Windows) or `python3.12 -m venv venv` (macOS/Linux)
+- **PyTorch**: Must install CUDA version first: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124`
+- **GPU Support**: Use `ANALYSIS_DEVICE=cuda` for NVIDIA GPUs, `cpu` otherwise
+- **Critical Dependencies**:
+  - PyTorch 2.5.x with CUDA 12.4 (GPU acceleration - 10-50x faster)
+  - Ultralytics 8.3.x (YOLOv8)
+  - Transformers 4.40+ (SigLIP)
+  - OpenCV 4.10+
+- **CUDA Compatibility**: PyTorch CUDA 12.4 works with CUDA 13.0 drivers (backward compatible)
+
+## Cross-Platform Development Standards
+- **Path handling**: Always use `os.path.join()` and `os.path.abspath()` for file paths in Python
+- **Environment variables**: Use `os.environ.get()` with proper defaults for cross-platform compatibility
+- **Executable detection**: Implement robust executable finding (FFmpeg, Python) across Windows/Mac/Linux
+- **Path separators**: Use `os.path.sep` instead of hardcoded `/` or `\`
+- **Virtual environments**: Always use Python 3.12 venv and document activation commands for all platforms
+- **Dependencies**: Pin specific versions in requirements.txt to avoid compatibility issues
+- **Subprocess calls**: Use `subprocess.run()` with proper environment variable handling
+- **PYTHONPATH**: Explicitly set PYTHONPATH in subprocess environments for module discovery
+
+## Code Documentation & Comments
+- **JSDoc comments**: Add comprehensive JSDoc to all functions, classes, and complex logic
+- **Inline comments**: Explain "why" not "what" - focus on business logic and complex algorithms
+- **Backend integration points**: Mark all API calls, data transformations, and external service integrations
+- **Complex logic**: Document mathematical calculations, data processing pipelines, and AI model interactions
+- **Error handling**: Comment on error scenarios, fallback strategies, and user experience considerations
+- **Performance notes**: Document optimization decisions, caching strategies, and performance-critical code
+- **TODO markers**: Use `// TODO: [context]` for temporary code or known improvements needed
+- **Example comments**:
+  ```typescript
+  /**
+   * Calculates tactical metrics from player tracking data
+   * @param trackingData - Raw position data from CV pipeline
+   * @param matchDuration - Total match time in seconds
+   * @returns Processed metrics for AI analysis
+   */
+  function calculateTacticalMetrics(trackingData: TrackingData[], matchDuration: number): TacticalMetrics {
+    // BACKEND_HOOK: This will be replaced with real CV pipeline data
+    // Performance: Optimized for 60fps data processing
+    // TODO: Add error handling for malformed tracking data
+  }
+  ```
+
+## Feature Implementation Standards
+- **Fully working features**: Implement complete, production-ready functionality
+- **Real data integration**: Use actual API calls, database connections, and live services
+- **No mock/simulated data**: Avoid placeholder data, use real backend integration
+- **Complete user flows**: Implement end-to-end functionality from user input to final output
+- **Error handling**: Include proper error states, loading states, and user feedback
+- **Performance optimization**: Implement efficient algorithms and caching strategies
+
+## Testing & Validation Approach
+- **No test file generation**: Do not create test scripts, test files, or testing guides
+- **Manual testing instructions**: Provide clear, step-by-step testing procedures
+- **Expected behavior documentation**: Describe exactly what should happen after implementation
+- **User testing scenarios**: Include specific user actions and expected outcomes
+- **Integration validation**: Explain how to verify backend connections and data flow
+- **Performance verification**: Describe how to check response times and system performance
+
+## Response Format & Documentation
+- **Concise overview**: Provide brief summary of implemented changes in your response
+- **No excessive documentation**: Do not generate multiple .md files for each feature
+- **Essential updates only**: Update only the most relevant existing documentation file
+- **Developer focus**: Give clear implementation overview and testing steps
+- **Avoid file proliferation**: Do not create integration_complete.md, developer_onboarding.md, setup_commands.md, implementation_summary.md, cli_commands_to_run.md, etc.
+- **Response structure**:
+  1. Brief overview of what was implemented
+  2. Key changes made to codebase
+  3. Manual testing steps
+  4. Expected behavior
+  5. Suggestion for which existing documentation file to update (if needed)
+
+## Performance Targets
+- Video upload → analysis complete: ≤5 min
+- Frontend load time: <2s
+- API response: <500ms (excluding CV processing)
+- CV pipeline: Process 60s clip in <3 min
+
+## Team Roles
+- **Frontend**: React pages, Supabase Auth, theme system, Vapi integration
+- **Backend/API**: FastAPI endpoints, signed URLs, job status polling
+- **AI/Worker**: YOLO pipeline, metrics computation, Letta integration
+- **PM**: Demo script, seed data, fallback content, pitch deck
+
+## Documentation Management
+- **Documentation Location**: All project documentation is in the `documentation/` folder
+- **Available Resources**:
+  - `PROJECT_IDEA.md` - Complete project vision and roadmap
+  - `CURRENT_VERSION.md` - Technical implementation status and what's working
+  - `data-structures.md` - API data models and database schemas
+  - `external-libs.md` - Third-party dependencies and integrations
+  - `file-structure.md` - Project organization and file structure
+- **Documentation Policy**:
+  - **DO NOT** create new documentation files (integration_complete.md, developer_onboarding.md, setup_commands.md, etc.)
+  - **DO NOT** automatically modify documentation files when making code changes
+  - **DO** provide concise overview of implemented changes in your response
+  - **DO** suggest which existing documentation files need updates when new features are completed
+  - **DO** reference existing documentation when providing context to developers
+  - **DO** update only the most relevant existing documentation file with essential information
+
+## Cursor Rules Management
+- **Rule Updates**: When the project reaches a point where `.cursor` rules need updates, tell the user: **"Tell Ramis to Update Cursor Rules"**
+- **Rule Evolution**: Rules should evolve with the project - don't modify them unless specifically requested
+- **Team Coordination**: All developers should be aware of rule changes to maintain consistency
+
+## Frontend Development Context
+- **Current Status**: Frontend is 100% complete with mock data (see `documentation/CURRENT_VERSION.md`)
+- **Development Mode**: Use Figma Make patterns for new frontend components
+- **Backend Integration**: Frontend is ready for backend API integration
+- **Mock Data**: All components use typed mock data - no real API calls yet
+- **Theme System**: Dynamic theming based on university + sport selection is fully implemented
+
+## 🚨 CRITICAL: Frontend Asset Import Rules
+**This is a Vite project, NOT Figma Make!**
+
+### ❌ NEVER USE:
+```ts
+import image from 'figma:asset/abc123.png';  // BREAKS BUILD!
+```
+
+### ✅ ALWAYS USE:
+```ts
+import image from '../assets/abc123.png';    // WORKS!
+```
+
+**All frontend developers must follow Vite import patterns, not Figma Make patterns.**
