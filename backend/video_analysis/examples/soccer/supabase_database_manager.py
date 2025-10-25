@@ -91,7 +91,7 @@ class SupabaseDatabaseManager:
         players = players_result.data
 
         for player in players:
-            key = (player['team_id'], player['number'])
+            key = (player['team_id'], player['jersey_number'])
             self.jersey_to_player[key] = player
 
         print(f"✓ Loaded {len(players)} players from database")
@@ -157,7 +157,7 @@ class SupabaseDatabaseManager:
         # Cache the mapping
         mapping = {
             'player_id': player['id'],
-            'jersey_number': player['number'],
+            'jersey_number': player['jersey_number'],
             'team_id': player['team_id'],
             'name': player['name'],
             'position': player['position']

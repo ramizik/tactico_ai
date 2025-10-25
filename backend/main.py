@@ -58,16 +58,13 @@ except ImportError as e:
 except Exception as e:
     print(f"Letta client initialization failed: {e}")
     letta_client = None
-from job_processor import start_job_processor
+
 import logging
 from datetime import datetime, timedelta
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Start job processor
-start_job_processor()
 
 # Clean up stale queued jobs from previous sessions (demo-friendly)
 try:
@@ -312,8 +309,8 @@ async def create_match(
     match_date: str = Form(...)
 ):
     """
-    Create a new match record
-    This will also create a processing job for the match
+    Create a new match record.
+    Job will be created later after video upload is complete.
     """
     try:
         # Validate sport (soccer only)
@@ -331,21 +328,16 @@ async def create_match(
 
         match_result = supabase.table("matches").insert(match_data).execute()
         match_id = match_result.data[0]["id"]
+        
+        logger.info(f"Match created: {match_id} - {opponent} on {match_date}")
 
-        # Create processing job
-        job_data = {
-            "match_id": match_id,
-            "status": "queued",
-            "progress": 0
-        }
-
-        job_result = supabase.table("jobs").insert(job_data).execute()
-        job_id = job_result.data[0]["id"]
+        # Note: Job creation happens AFTER video upload (in upload_video_chunk endpoint)
+        # This prevents processing jobs from starting before video is available
 
         return {
             "match_id": match_id,
-            "job_id": job_id,
-            "status": "queued"
+            "job_id": None,  # No job yet - will be created after video upload
+            "status": "created"
         }
 
     except HTTPException:
@@ -535,34 +527,54 @@ async def upload_video_chunk(
         if not update_result.data:
             raise HTTPException(status_code=404, detail="Match not found")
 
-        # Check if this is the first 3 chunks (trigger Quick Brief)
-        if chunk_index == 2:  # 0-indexed, so chunk 2 = 3rd chunk
-            # Create Quick Brief job
-            job_data = {
-                "match_id": match_id,
-                "status": "queued",
-                "progress": 0,
-                "job_type": "quick_brief",
-                "video_segment_start": 0.0,
-                "video_segment_end": 180.0  # 3 minutes = 180 seconds
-            }
-            supabase.table("jobs").insert(job_data).execute()
+        # Note: Quick Brief analysis removed - only Enhanced Analysis is supported
+        # Enhanced Analysis job is created after all chunks are uploaded (see below)
 
         # Check if all chunks uploaded (trigger Enhanced Analysis)
         if chunk_index == total_chunks - 1:  # Last chunk
-            # Update upload status
-            supabase.table("matches").update({
-                "upload_status": "uploaded"
+            # Update upload status and ensure chunk counts are finalized
+            # Consolidate into single update to avoid race conditions
+            final_update = supabase.table("matches").update({
+                "upload_status": "uploaded",
+                "video_chunks_uploaded": total_chunks,  # Ensure final count is set
+                "video_chunks_total": total_chunks       # Ensure total is confirmed
             }).eq("id", match_id).execute()
+            
+            # Verify the update succeeded before creating job
+            if not final_update.data:
+                logger.error(f"Failed to finalize upload status for match {match_id}")
+                raise HTTPException(status_code=500, detail="Failed to finalize upload status")
+            
+            logger.info(f"Upload finalized for match {match_id}: {total_chunks} chunks")
+            
+            # Small delay to ensure database consistency across replicas (Supabase)
+            # This prevents race condition where job processor queries before update propagates
+            import time
+            time.sleep(0.3)  # 300ms delay for database propagation
 
             # Create Enhanced Analysis job (split-screen with ball tracking)
-            job_data = {
-                "match_id": match_id,
-                "status": "queued",
-                "progress": 0,
-                "job_type": "enhanced_analysis"  # Using new enhanced analysis
-            }
-            supabase.table("jobs").insert(job_data).execute()
+            # First check if a job already exists for this match to avoid duplicates
+            existing_jobs = supabase.table("jobs").select("id, status").eq("match_id", match_id).eq("job_type", "enhanced_analysis").execute()
+            
+            if existing_jobs.data:
+                # Job already exists, log it but don't fail
+                existing_job = existing_jobs.data[0]
+                logger.info(f"Enhanced analysis job already exists: {existing_job['id']} (status: {existing_job['status']})")
+            else:
+                # Create new job
+                job_data = {
+                    "match_id": match_id,
+                    "status": "queued",
+                    "progress": 0,
+                    "job_type": "enhanced_analysis"  # Using new enhanced analysis
+                }
+                try:
+                    job_result = supabase.table("jobs").insert(job_data).execute()
+                    logger.info(f"Enhanced analysis job created: {job_result.data[0]['id']}")
+                except Exception as job_error:
+                    logger.error(f"Failed to create job for match {match_id}: {job_error}")
+                    # Don't fail the upload, job can be created manually later
+                    logger.warning("Upload succeeded but job creation failed. Job can be triggered manually.")
 
         return {
             "chunk_index": chunk_index,

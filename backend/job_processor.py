@@ -98,6 +98,20 @@ class JobProcessor:
             if not match:
                 raise Exception("Match not found")
 
+            # Safety check: Skip jobs for matches without video
+            # This handles any legacy jobs created before video upload
+            upload_status = match.get("upload_status", "pending")
+            if upload_status != "uploaded":
+                logger.warning(
+                    f"Job {job_id} skipped: Match {match_id} video not uploaded yet "
+                    f"(upload_status={upload_status}). This job will be cancelled."
+                )
+                self._update_job_status(
+                    job_id, "cancelled", 0, 
+                    "Job cancelled: Video not uploaded. Job was likely created prematurely."
+                )
+                return
+
             # Process enhanced_analysis only
             if job_type == "enhanced_analysis":
                 result = self._process_enhanced_analysis(job_id, match_id, match)
@@ -119,8 +133,25 @@ class JobProcessor:
             team_id = match["team_id"]
             total_chunks = match.get("video_chunks_total", 0)
 
+            # Retry logic to handle potential database replication lag
             if total_chunks == 0:
-                raise Exception("No video chunks found for enhanced analysis")
+                logger.warning(f"No chunks found initially for match {match_id}, retrying after delay...")
+                import time
+                time.sleep(2)  # Wait 2 seconds for database replication
+                
+                # Retry fetching match details
+                match = self._get_match_details(match_id)
+                if match:
+                    total_chunks = match.get("video_chunks_total", 0)
+                    logger.info(f"After retry: found {total_chunks} chunks for match {match_id}")
+                
+                # If still no chunks, this is a real error
+                if total_chunks == 0:
+                    raise Exception(
+                        f"No video chunks found for enhanced analysis. "
+                        f"Match {match_id} has video_chunks_total=0. "
+                        f"Please ensure video upload completed successfully."
+                    )
 
             # Update progress
             self._update_job_status(job_id, "running", 10)
