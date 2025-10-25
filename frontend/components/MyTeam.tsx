@@ -1,11 +1,11 @@
+import { Award, TrendingUp, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { UserPlus, UserMinus, TrendingUp, Award, Upload } from 'lucide-react';
 import { SportSwitcher } from './SportSwitcher';
+import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface Player {
@@ -69,7 +69,7 @@ const initialPlayers: Player[] = [
 ];
 
 export const MyTeam = () => {
-  const { theme, sport, university } = useTheme();
+  const { theme, university } = useTheme();
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [isAddPlayerOpen, setIsAddPlayerOpen] = useState(false);
   const [newPlayer, setNewPlayer] = useState({
@@ -119,17 +119,12 @@ export const MyTeam = () => {
     });
   };
 
-  /**
-   * BACKEND_HOOK (Remove Player):
-   * - DELETE /api/teams/{teamId}/players/{playerId}
-   */
-  const handleRemovePlayer = (playerId: number) => {
-    setPlayers(players.filter(p => p.id !== playerId));
-  };
+  // Note: Remove player functionality is not currently implemented in the UI
+  // const handleRemovePlayer = (playerId: number) => {
+  //   setPlayers(players.filter(p => p.id !== playerId));
+  // };
 
-  const positions = sport === 'Football' 
-    ? ['Goalkeeper', 'Defender', 'Midfielder', 'Forward']
-    : ['Point Guard', 'Shooting Guard', 'Small Forward', 'Power Forward', 'Center'];
+  const positions = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
 
   // Get university display name
   const getUniversityName = () => {
@@ -171,7 +166,7 @@ export const MyTeam = () => {
               </div>
             </div>
           </div>
-          
+
           <div
             className="bg-white border-4 p-6"
             style={{ borderColor: theme.accent }}
@@ -186,7 +181,7 @@ export const MyTeam = () => {
               </div>
             </div>
           </div>
-          
+
           <div
             className="bg-white border-4 p-6"
             style={{ borderColor: theme.accent }}
@@ -296,11 +291,11 @@ export const MyTeam = () => {
         <Dialog open={isAddPlayerOpen} onOpenChange={setIsAddPlayerOpen}>
           <DialogContent className="bg-white border-4 max-w-2xl" style={{ borderColor: theme.accent }}>
             <DialogHeader>
-              <DialogTitle 
-                style={{ 
-                  fontSize: '1.75rem', 
-                  fontWeight: 900, 
-                  color: theme.secondary 
+              <DialogTitle
+                style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 900,
+                  color: theme.secondary
                 }}
               >
                 Add New Player
@@ -371,10 +366,10 @@ export const MyTeam = () => {
                 </Label>
                 <Select
                   value={newPlayer.position}
-                  onValueChange={(value) => setNewPlayer({ ...newPlayer, position: value })}
+                  onValueChange={(value: string) => setNewPlayer({ ...newPlayer, position: value })}
                 >
-                  <SelectTrigger 
-                    className="mt-2 border-2" 
+                  <SelectTrigger
+                    className="mt-2 border-2"
                     style={{ borderColor: theme.accent }}
                   >
                     <SelectValue placeholder="Select position" />
@@ -471,7 +466,7 @@ export const MyTeam = () => {
           </DialogContent>
         </Dialog>
       </div>
-      
+
       <SportSwitcher />
     </div>
   );

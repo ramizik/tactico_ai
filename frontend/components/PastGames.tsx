@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { Maximize2, Minimize2, Plus, Video, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import goalkeeperImage from '../assets/e182018dfac45d64e40e055e6351b8c34ba96aeb.png';
 import { useTheme } from '../contexts/ThemeContext';
-import { Video, Plus, X, Minimize2, Maximize2 } from 'lucide-react';
-import { SportSwitcher } from './SportSwitcher';
 import { AddMatch } from './AddMatch';
 import { AIChat } from './AIChat';
-import goalkeeperImage from 'figma:asset/e182018dfac45d64e40e055e6351b8c34ba96aeb.png';
+import { SportSwitcher } from './SportSwitcher';
 
 const pastGames = [
   {
@@ -40,7 +40,7 @@ const pastGames = [
 ];
 
 export const PastGames = () => {
-  const { theme, sport } = useTheme();
+  const { theme } = useTheme();
   const [showAddMatch, setShowAddMatch] = useState(false);
   const [selectedGame, setSelectedGame] = useState<typeof pastGames[0] | null>(null);
   const [showAIChat, setShowAIChat] = useState(false);
@@ -133,7 +133,7 @@ export const PastGames = () => {
                 Match History
               </h2>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -199,8 +199,8 @@ export const PastGames = () => {
 
           {/* Goalkeeper Visual - Always Visible */}
           <div className="hidden lg:flex items-center justify-center">
-            <img 
-              src={goalkeeperImage} 
+            <img
+              src={goalkeeperImage}
               alt="Football Goalkeeper"
               className="w-full max-w-[500px] h-auto object-contain"
             />
@@ -229,7 +229,7 @@ export const PastGames = () => {
 
       {/* Floating AI Chat Window */}
       {showAIChat && selectedGame && (
-        <AIChat 
+        <AIChat
           onClose={() => {
             setShowAIChat(false);
           }}
@@ -304,7 +304,7 @@ export const PastGames = () => {
           )}
         </div>
       )}
-      
+
       <SportSwitcher />
     </div>
   );

@@ -1,13 +1,13 @@
 /**
  * AddMatch - 4-Step User Flow Component
  * Handles the complete flow for adding a new match with video upload and analysis tracking.
- * 
+ *
  * Steps:
  * 1. Details - Enter match information (opponent, date) - Sport is always Football
  * 2. Upload - Upload video file with progress tracking
  * 3. Analysis - Monitor AI analysis progress (quick brief + full analysis)
  * 4. Complete - Success screen with actions
- * 
+ *
  * BACKEND_HOOK:
  * - Step 1: POST /api/matches { teamId, opponent, date, sport: 'Football' }
  * - Step 2: Upload to Supabase Storage, POST video reference
@@ -15,15 +15,15 @@
  * - Step 4: Redirect to match detail or dashboard
  */
 
-import { useState, useEffect } from 'react';
+import { AlertCircle, ArrowLeft, Calendar as CalendarIcon, Check, CheckCircle2, Clock, Loader2, Upload as UploadIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { ArrowLeft, Check, Upload as UploadIcon, Clock, CheckCircle2, Loader2, AlertCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from './ui/button';
+import { Calendar } from './ui/calendar';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Progress } from './ui/progress';
-import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Progress } from './ui/progress';
 
 interface AddMatchProps {
   onBack: () => void;
@@ -306,11 +306,11 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
                       <span style={{ color: matchDetails.date ? 'inherit' : '#9ca3af' }}>
                         {matchDetails.date
                           ? matchDetails.date.toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
                           : 'Select a date'}
                       </span>
                     </button>
@@ -319,7 +319,7 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
                     <Calendar
                       mode="single"
                       selected={matchDetails.date || undefined}
-                      onSelect={(date) => {
+                      onSelect={(date: Date | undefined) => {
                         setMatchDetails({ ...matchDetails, date: date || null });
                         setCalendarOpen(false);
                       }}
@@ -561,7 +561,7 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
               <Button
                 onClick={() => {
                   setCurrentStep(1);
-                  setMatchDetails({ opponent: '', date: null, sport: 'Soccer' });
+                  setMatchDetails({ opponent: '', date: null });
                   setUploadStatus(null);
                   setAnalysisStatus({
                     quickBrief: 'queued',

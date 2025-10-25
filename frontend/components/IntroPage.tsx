@@ -2,8 +2,8 @@ import { Upload, Brain, Mic, TrendingUp, Zap } from 'lucide-react';
 import { GreenOrangeBackground } from './GreenOrangeBackground';
 import { SponsorMarquee } from './SponsorMarquee';
 import { useState, useEffect } from 'react';
-import coachImage from 'figma:asset/03f1d50dd2f0e2ff799c65ce1dde71a77be2e934.png';
-import soccerImage from 'figma:asset/cdcbf7f15e4bda1914ab23b84eb97ee3c2d8e36b.png';
+import coachImage from '../assets/03f1d50dd2f0e2ff799c65ce1dde71a77be2e934.png';
+import soccerImage from '../assets/cdcbf7f15e4bda1914ab23b84eb97ee3c2d8e36b.png';
 
 interface IntroPageProps {
   onGetStarted: () => void;

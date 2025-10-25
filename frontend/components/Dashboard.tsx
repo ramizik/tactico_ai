@@ -1,6 +1,6 @@
-import { useTheme } from '../contexts/ThemeContext';
 import { TrendingUp } from 'lucide-react';
-import coachImage from 'figma:asset/7bfaab3066f6ffb1c8b4b53ce7e35a1b4a681d8a.png';
+import coachImage from '../assets/7bfaab3066f6ffb1c8b4b53ce7e35a1b4a681d8a.png';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface DashboardProps {
   onMatchClick: () => void;
@@ -36,7 +36,7 @@ const recentMatches = [
 
 
 export const Dashboard = ({ onMatchClick }: DashboardProps) => {
-  const { theme, sport } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <div className="min-h-screen px-6 md:px-12 pb-8" style={{ paddingTop: '60px' }}>
@@ -160,8 +160,8 @@ export const Dashboard = ({ onMatchClick }: DashboardProps) => {
 
           {/* Coach Image */}
           <div className="flex items-center justify-center">
-            <img 
-              src={coachImage} 
+            <img
+              src={coachImage}
               alt="AI Football Coach"
               className="h-[450px] w-auto object-contain"
             />

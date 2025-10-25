@@ -1,6 +1,6 @@
 import { useTheme } from '../contexts/ThemeContext';
-import uopLogo from 'figma:asset/6f52a6f51b1118f22614d64aa4f3ac3088637952.png';
-import ucLogo from 'figma:asset/9717c66175f8bd785a58b86d4b7ddb44dd1476d2.png';
+import uopLogo from '../assets/6f52a6f51b1118f22614d64aa4f3ac3088637952.png';
+import ucLogo from '../assets/9717c66175f8bd785a58b86d4b7ddb44dd1476d2.png';
 
 export const GlobalHeader = () => {
   const { university } = useTheme();

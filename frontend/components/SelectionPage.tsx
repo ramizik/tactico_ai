@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useTheme, University, Sport } from '../contexts/ThemeContext';
+import { University, useTheme } from '../contexts/ThemeContext';
 import { GreenOrangeBackground } from './GreenOrangeBackground';
 
 interface SelectionPageProps {
@@ -31,7 +30,7 @@ export const SelectionPage = ({ onComplete }: SelectionPageProps) => {
         >
           Select Your University
         </h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <button
             onClick={() => handleUniversitySelect('UOP')}
@@ -42,7 +41,7 @@ export const SelectionPage = ({ onComplete }: SelectionPageProps) => {
             </div>
             <div className="text-gray-600 mt-2">University of the Pacific</div>
           </button>
-          
+
           <button
             onClick={() => handleUniversitySelect('UC_CALIFORNIA')}
             className="p-8 bg-white border-4 border-black rounded-none transition-all hover:scale-105"

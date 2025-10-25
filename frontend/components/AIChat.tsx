@@ -19,7 +19,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Maximize2, Minimize2, Send, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useTheme } from '../contexts/ThemeContext';
 
 interface Message {
   id: string;
@@ -34,7 +33,6 @@ interface AIChatProps {
 }
 
 export const AIChat = ({ onClose, matchInfo }: AIChatProps) => {
-  const { theme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -75,7 +73,7 @@ export const AIChat = ({ onClose, matchInfo }: AIChatProps) => {
     setTimeout(() => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: generateMockResponse(inputValue),
+        text: generateMockResponse(),
         sender: 'ai',
         timestamp: new Date(),
       };
@@ -92,7 +90,7 @@ export const AIChat = ({ onClose, matchInfo }: AIChatProps) => {
   };
 
   // Mock AI response generator
-  const generateMockResponse = (userInput: string): string => {
+  const generateMockResponse = (): string => {
     const responses = [
       "That's a great question! Based on your team's recent performance, I'd recommend focusing on maintaining possession in the midfield.",
       "I've analyzed your last match. The defense showed strong organization, but there's room to improve transitions from defense to attack.",
@@ -292,8 +290,8 @@ export const AIChat = ({ onClose, matchInfo }: AIChatProps) => {
                     >
                       <div
                         className={`max-w-[75%] px-4 py-3 shadow-sm ${message.sender === 'user'
-                            ? 'rounded-[20px] rounded-br-[5px]'
-                            : 'rounded-[20px] rounded-bl-[5px]'
+                          ? 'rounded-[20px] rounded-br-[5px]'
+                          : 'rounded-[20px] rounded-bl-[5px]'
                           }`}
                         style={{
                           backgroundColor: message.sender === 'user' ? '#477023' : '#f3f4f6',

@@ -1,26 +1,25 @@
 import { useTheme } from '../contexts/ThemeContext';
 
 export const ThemedBackground = () => {
-  const { theme, sport } = useTheme();
-  
+  const { theme } = useTheme();
+
   // For Football: Green-dominant gradient mixed with university colors
-  // For Basketball: Orange-dominant gradient mixed with university colors
-  const sportBase = sport === 'FOOTBALL' ? '#477023' : '#f97316';
-  const sportSecondary = sport === 'FOOTBALL' ? '#477023' : '#fb923c';
-  const sportTertiary = sport === 'FOOTBALL' ? '#477023' : '#ea580c';
+  const sportBase = '#477023';
+  const sportSecondary = '#477023';
+  const sportTertiary = '#477023';
 
   return (
     <>
       {/* Multiple gradient layers that cross-fade for smooth animation */}
-      <div 
+      <div
         className="fixed inset-0 z-0"
         style={{
           background: `linear-gradient(135deg, ${sportBase} 0%, ${theme.primary} 50%, ${theme.secondary} 100%)`,
           animation: 'fadeThemeGradient1 25s ease-in-out infinite'
         }}
       />
-      
-      <div 
+
+      <div
         className="fixed inset-0 z-0"
         style={{
           background: `linear-gradient(180deg, ${theme.primary} 0%, ${sportBase} 50%, ${theme.secondary} 100%)`,
@@ -28,8 +27,8 @@ export const ThemedBackground = () => {
           opacity: 0
         }}
       />
-      
-      <div 
+
+      <div
         className="fixed inset-0 z-0"
         style={{
           background: `linear-gradient(225deg, ${theme.secondary} 0%, ${sportSecondary} 50%, ${theme.primary} 100%)`,
@@ -37,8 +36,8 @@ export const ThemedBackground = () => {
           opacity: 0
         }}
       />
-      
-      <div 
+
+      <div
         className="fixed inset-0 z-0"
         style={{
           background: `linear-gradient(270deg, ${sportBase} 0%, ${theme.secondary} 50%, ${theme.primary} 100%)`,
@@ -46,8 +45,8 @@ export const ThemedBackground = () => {
           opacity: 0
         }}
       />
-      
-      <div 
+
+      <div
         className="fixed inset-0 z-0"
         style={{
           background: `linear-gradient(315deg, ${theme.primary} 0%, ${sportSecondary} 50%, ${theme.secondary} 100%)`,
@@ -55,9 +54,9 @@ export const ThemedBackground = () => {
           opacity: 0
         }}
       />
-      
+
       {/* Sport color blob - dominant */}
-      <div 
+      <div
         className="fixed z-0"
         style={{
           width: '1200px',
@@ -70,9 +69,9 @@ export const ThemedBackground = () => {
           left: '-350px'
         }}
       />
-      
+
       {/* Primary university color blob */}
-      <div 
+      <div
         className="fixed z-0"
         style={{
           width: '1000px',
@@ -85,9 +84,9 @@ export const ThemedBackground = () => {
           right: '-300px'
         }}
       />
-      
+
       {/* Secondary university color blob */}
-      <div 
+      <div
         className="fixed z-0"
         style={{
           width: '950px',
@@ -100,9 +99,9 @@ export const ThemedBackground = () => {
           left: '35%'
         }}
       />
-      
+
       {/* Additional sport color blob for emphasis */}
-      <div 
+      <div
         className="fixed z-0"
         style={{
           width: '1100px',
@@ -115,7 +114,7 @@ export const ThemedBackground = () => {
           right: '20%'
         }}
       />
-      
+
       <style>{`
         @keyframes fadeThemeGradient1 {
           0%, 100% {
@@ -125,7 +124,7 @@ export const ThemedBackground = () => {
             opacity: 0;
           }
         }
-        
+
         @keyframes fadeThemeGradient2 {
           0%, 40%, 100% {
             opacity: 0;
@@ -134,7 +133,7 @@ export const ThemedBackground = () => {
             opacity: 1;
           }
         }
-        
+
         @keyframes fadeThemeGradient3 {
           0%, 20%, 60%, 100% {
             opacity: 0;
@@ -143,7 +142,7 @@ export const ThemedBackground = () => {
             opacity: 1;
           }
         }
-        
+
         @keyframes fadeThemeGradient4 {
           0%, 40%, 80%, 100% {
             opacity: 0;
@@ -152,7 +151,7 @@ export const ThemedBackground = () => {
             opacity: 1;
           }
         }
-        
+
         @keyframes fadeThemeGradient5 {
           0%, 60%, 100% {
             opacity: 0;
@@ -161,7 +160,7 @@ export const ThemedBackground = () => {
             opacity: 1;
           }
         }
-        
+
         @keyframes floatTheme1 {
           0%, 100% {
             transform: translate(0, 0) scale(1);
@@ -173,7 +172,7 @@ export const ThemedBackground = () => {
             transform: translate(15vw, 50vh) scale(0.95);
           }
         }
-        
+
         @keyframes floatTheme2 {
           0%, 100% {
             transform: translate(0, 0) scale(1);
@@ -185,7 +184,7 @@ export const ThemedBackground = () => {
             transform: translate(-50vw, -15vh) scale(1.15);
           }
         }
-        
+
         @keyframes floatTheme3 {
           0%, 100% {
             transform: translate(0, 0) scale(1);
@@ -197,7 +196,7 @@ export const ThemedBackground = () => {
             transform: translate(25vw, -40vh) scale(0.9);
           }
         }
-        
+
         @keyframes floatTheme4 {
           0%, 100% {
             transform: translate(0, 0) scale(1);

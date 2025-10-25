@@ -20,6 +20,32 @@ You must annotate the code with informative comments and clearly mark where back
 9. **Testability.** Add `data-testid` attributes to significant elements.
 10. **Copy & micro-UX.** Provide sensible labels, empty states, loading skeletons, and error banners.
 
+## 🚨 CRITICAL: Import & Build Rules
+
+### **Asset Imports**
+- **NEVER** use `figma:asset/` prefix for imports
+- **ALWAYS** use relative paths: `../assets/filename.png`
+- **ALWAYS** create proper TypeScript declarations for assets in `types/assets.d.ts`
+- **NEVER** import assets with version numbers or special prefixes
+
+### **Package Imports**
+- **NEVER** include version numbers in import statements
+- **CORRECT**: `import { Button } from '@radix-ui/react-button'`
+- **WRONG**: `import { Button } from '@radix-ui/react-button@1.2.3'`
+- **ALWAYS** use clean package names without version suffixes
+
+### **TypeScript Configuration**
+- **ALWAYS** exclude `vite.config.ts` from main tsconfig.json compilation
+- **ALWAYS** include proper type declarations for asset files
+- **NEVER** leave implicit `any` types - always provide explicit types
+- **ALWAYS** remove unused imports and variables to prevent build errors
+
+### **Build Validation**
+- **MANDATORY**: Code must compile with `npm run build` without errors
+- **MANDATORY**: Development server must start with `npm run dev` without errors
+- **NEVER** commit code that fails TypeScript compilation
+- **ALWAYS** test build process before considering code complete
+
 ---
 
 ## 🧱 Project Overview (Pages & Purpose)
@@ -29,12 +55,12 @@ Generate a multi-page React app with these routes and responsibilities:
 1. **Landing / Intro** (`/`)
    - Centered CTA ("Get Started") and short value prop.
    - Secondary CTA: "View Demo Matches".
-   - **Theme preview** chips (soccer/basketball + college variants).
+   - **Theme preview** chips (soccer + college variants).
    - Animated background with gradient overlays.
 
 2. **Selection** (`/selection`)
    - University selection (UOP, UC California) with dynamic theming.
-   - Sport selection (Soccer, Basketball) with emoji icons.
+   - Sport selection (Soccer) with emoji icons.
    - Smooth transitions and theme application.
 
 3. **Dashboard** (`/dashboard`)
@@ -67,7 +93,7 @@ Generate a multi-page React app with these routes and responsibilities:
 
 ## 🎨 Theming & Layout Requirements
 
-- **Theme engine** driven by **sport** (soccer/basketball) + **college** (UOP, UC California):
+- **Theme engine** driven by **sport** (soccer) + **college** (UOP, UC California):
   - Colors, logo, accent borders, background textures.
   - Provide **mock theme registry** (TS) keyed by `{ sport, collegeCode }`.
 - **Design tokens** via CSS variables (in Tailwind layer).
@@ -82,7 +108,7 @@ Create a small **`/src/mocks`** folder with typed fixtures and "fake service" fu
 
 - `themes.ts`: typed map of colleges & sport themes (colors, logos).
 - `user.ts`: mock session object after "login".
-- `matches.ts`: sample matches for soccer & basketball with statuses.
+- `matches.ts`: sample matches for soccer with statuses.
 - `analysis.ts`: per-match **LLM-ready JSON** examples:
 
   ```ts
@@ -121,7 +147,7 @@ Create a small **`/src/mocks`** folder with typed fixtures and "fake service" fu
   };
   ```
 
-- `players.ts`: roster for two demo teams with soccer/basketball positions.
+- `players.ts`: roster for two demo teams with soccer positions.
 - `uploads.ts`: a fake queue API (in-memory) to simulate: `queued → processing → analyzed` with timeouts.
 
 **All code must compile and run without network connectivity.**
@@ -244,7 +270,6 @@ Create this structure and populate it:
 - UOP: Orange (#FF671D) + Black (#231F20)
 - UC California: Blue (#1295D8) + Gold (#FFB511)
 - Soccer: Green accent (#22c55e)
-- Basketball: Orange accent (#f97316)
 
 ### **Navigation Structure**
 
@@ -275,6 +300,93 @@ Create this structure and populate it:
 - Upload queue simulates status changes to "Analyzed" within ~10s.
 - Match Detail shows **video, summary, formation SVG, metrics grid, events table, players table**, and **voice coach modal**.
 - Lighthouse a11y score ≥ 90 on core pages (rough).
+
+## 🔧 Code Quality & Validation Checklist
+
+### **Pre-Commit Validation**
+- [ ] `npm run build` completes without TypeScript errors
+- [ ] `npm run dev` starts without errors
+- [ ] All imports use correct paths (no `figma:asset/` prefixes)
+- [ ] All package imports are clean (no version numbers)
+- [ ] No unused imports or variables
+- [ ] All TypeScript types are explicit (no implicit `any`)
+- [ ] Asset imports use relative paths: `../assets/filename.png`
+
+### **Import Standards**
+```typescript
+// ✅ CORRECT Asset Imports
+import logoImage from '../assets/logo.png';
+import coachImage from '../assets/coach.png';
+
+// ❌ WRONG Asset Imports
+import logoImage from 'figma:asset/logo.png';
+import coachImage from 'figma:asset/coach.png';
+
+// ✅ CORRECT Package Imports
+import { Button } from '@radix-ui/react-button';
+import { Dialog } from '@radix-ui/react-dialog';
+
+// ❌ WRONG Package Imports
+import { Button } from '@radix-ui/react-button@1.2.3';
+import { Dialog } from '@radix-ui/react-dialog@1.1.6';
+```
+
+### **TypeScript Configuration Requirements**
+```json
+// tsconfig.json must include:
+{
+  "exclude": ["vite.config.ts"],
+  "include": ["**/*.ts", "**/*.tsx", "types/**/*.d.ts"]
+}
+```
+
+### **Asset Type Declarations**
+```typescript
+// types/assets.d.ts must exist with:
+declare module "*.png" {
+  const value: string;
+  export default value;
+}
+declare module "*.jpg" {
+  const value: string;
+  export default value;
+}
+```
+
+---
+
+## ⚠️ Common Pitfalls & Prevention
+
+### **Asset Import Errors**
+- **Problem**: Using `figma:asset/` prefix causes module resolution failures
+- **Solution**: Always use relative paths `../assets/filename.png`
+- **Prevention**: Never use special prefixes for asset imports
+
+### **Package Import Errors**
+- **Problem**: Including version numbers in imports causes build failures
+- **Solution**: Use clean package names without version suffixes
+- **Prevention**: Always import packages by name only, never with `@version`
+
+### **TypeScript Configuration Issues**
+- **Problem**: `vite.config.ts` conflicts with main TypeScript compilation
+- **Solution**: Exclude `vite.config.ts` from main tsconfig.json
+- **Prevention**: Always separate build configs from app configs
+
+### **Unused Variable Errors**
+- **Problem**: Unused imports and variables cause TypeScript strict mode failures
+- **Solution**: Remove all unused imports and variables
+- **Prevention**: Use ESLint rules to catch unused variables automatically
+
+### **Implicit Any Types**
+- **Problem**: Missing type annotations cause TypeScript errors
+- **Solution**: Always provide explicit types for function parameters
+- **Prevention**: Enable strict TypeScript mode and avoid `any` types
+
+### **Build Validation Process**
+1. **Before coding**: Ensure `npm run build` works
+2. **During development**: Run `npm run build` frequently
+3. **Before committing**: Always test both `npm run build` and `npm run dev`
+4. **After changes**: Verify no new TypeScript errors introduced
 
 ---
 

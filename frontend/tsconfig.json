@@ -31,7 +31,11 @@
     },
     "include": [
         "**/*.ts",
-        "**/*.tsx"
+        "**/*.tsx",
+        "types/**/*.d.ts"
+    ],
+    "exclude": [
+        "vite.config.ts"
     ],
     "references": [
         {

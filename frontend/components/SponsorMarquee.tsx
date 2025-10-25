@@ -1,9 +1,9 @@
-import lettaLogo from 'figma:asset/8277ba994e7aa2a6faed0978364ee57b4852b0d8.png';
-import vapiLogo from 'figma:asset/0a23b62bdc85870bebaf0ea576f82cfcfe826d2e.png';
-import figmaLogo from 'figma:asset/872f41e4c293726b65c290de40221d276bec73f8.png';
-import fastApiLogo from 'figma:asset/b02c0947c4e8e2a3c39720ae4eeb6a4f054801c4.png';
-import boltLogo from 'figma:asset/6a8ffa74e936065248eccbee550ab208d8d3f48b.png';
-import unityLogo from 'figma:asset/c84cb4913ddef31b5a0d3d0773e23e5e714ba67e.png';
+import lettaLogo from '../assets/8277ba994e7aa2a6faed0978364ee57b4852b0d8.png';
+import vapiLogo from '../assets/0a23b62bdc85870bebaf0ea576f82cfcfe826d2e.png';
+import figmaLogo from '../assets/872f41e4c293726b65c290de40221d276bec73f8.png';
+import fastApiLogo from '../assets/b02c0947c4e8e2a3c39720ae4eeb6a4f054801c4.png';
+import boltLogo from '../assets/6a8ffa74e936065248eccbee550ab208d8d3f48b.png';
+import unityLogo from '../assets/c84cb4913ddef31b5a0d3d0773e23e5e714ba67e.png';
 
 const sponsors = [
   { id: 1, logo: lettaLogo, name: 'Letta' },

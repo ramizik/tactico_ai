@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, ReactNode, useContext, useState } from 'react';
 
 export type University = 'UOP' | 'UC_CALIFORNIA' | null;
-export type Sport = 'FOOTBALL' | 'BASKETBALL' | null;
+export type Sport = 'FOOTBALL' | null;
 
 interface Theme {
   primary: string;
@@ -19,13 +19,7 @@ interface ThemeContextType {
   setSport: (sport: Sport) => void;
 }
 
-const defaultTheme: Theme = {
-  primary: '#1295D8',
-  secondary: '#FFB511',
-  accent: '#477023',
-  gradientFrom: '#477023',
-  gradientTo: '#f97316',
-};
+// Default theme is no longer used since we always have university/sport context
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -58,10 +52,6 @@ const getTheme = (university: University, sport: Sport): Theme => {
     accent = '#477023';
     gradientFrom = '#477023';
     gradientTo = '#477023';
-  } else if (sport === 'BASKETBALL') {
-    accent = '#f97316';
-    gradientFrom = '#f97316';
-    gradientTo = '#fb923c';
   }
 
   return { primary, secondary, accent, gradientFrom, gradientTo };
