@@ -1,13 +1,15 @@
 /**
  * API Client for TacticoAI Backend Integration
  * Provides typed methods for all backend REST endpoints
+ * Updated: 2025-10-25 - Fixed API base URL to use relative paths
  */
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 // Teams API
 export const teamsApi = {
     getAll: async () => {
+        console.log('Making API request to:', `${API_BASE_URL}/api/teams`);
         const res = await fetch(`${API_BASE_URL}/api/teams`);
         if (!res.ok) throw new Error('Failed to fetch teams');
         const data = await res.json();
@@ -147,6 +149,14 @@ export const uploadApi = {
     getUploadStatus: async (matchId: string) => {
         const res = await fetch(`${API_BASE_URL}/api/matches/${matchId}/upload-status`);
         if (!res.ok) throw new Error('Failed to fetch upload status');
+        return await res.json();
+    },
+
+    analyzeFirstChunk: async (teamId: string, matchId: string) => {
+        const res = await fetch(`${API_BASE_URL}/api/upload/analyze-first-chunk/${teamId}/${matchId}`, {
+            method: 'POST'
+        });
+        if (!res.ok) throw new Error('Failed to trigger preview analysis');
         return await res.json();
     }
 };

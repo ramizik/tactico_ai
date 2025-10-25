@@ -107,16 +107,18 @@ class JobProcessor:
                     f"(upload_status={upload_status}). This job will be cancelled."
                 )
                 self._update_job_status(
-                    job_id, "cancelled", 0, 
+                    job_id, "cancelled", 0,
                     "Job cancelled: Video not uploaded. Job was likely created prematurely."
                 )
                 return
 
-            # Process enhanced_analysis only
+            # Process different job types
             if job_type == "enhanced_analysis":
                 result = self._process_enhanced_analysis(job_id, match_id, match)
+            elif job_type == "preview_analysis":
+                result = self._process_preview_analysis(job_id, match_id, match)
             else:
-                raise Exception(f"Unsupported job type: {job_type}. Only 'enhanced_analysis' is supported.")
+                raise Exception(f"Unsupported job type: {job_type}. Supported types: 'enhanced_analysis', 'preview_analysis'.")
 
             # Update job as completed
             self._update_job_status(job_id, "completed", 100)
@@ -138,13 +140,13 @@ class JobProcessor:
                 logger.warning(f"No chunks found initially for match {match_id}, retrying after delay...")
                 import time
                 time.sleep(2)  # Wait 2 seconds for database replication
-                
+
                 # Retry fetching match details
                 match = self._get_match_details(match_id)
                 if match:
                     total_chunks = match.get("video_chunks_total", 0)
                     logger.info(f"After retry: found {total_chunks} chunks for match {match_id}")
-                
+
                 # If still no chunks, this is a real error
                 if total_chunks == 0:
                     raise Exception(
@@ -184,6 +186,14 @@ class JobProcessor:
             logger.info(f"Enhanced video saved locally: {video_path}")
             logger.info(f"Tracking data exported to: backend/tracking_data/")
 
+            # Update match with full analysis path
+            if analysis_results.get("csv_path"):
+                self.supabase.table("matches").update({
+                    "full_analysis_path": analysis_results["csv_path"],
+                    "full_analysis_completed_at": datetime.utcnow().isoformat()
+                }).eq("id", match_id).execute()
+                logger.info(f"Full analysis path saved: {analysis_results['csv_path']}")
+
             # Update progress
             self._update_job_status(job_id, "running", 95)
 
@@ -195,6 +205,50 @@ class JobProcessor:
         finally:
             if 'processor' in locals():
                 processor.cleanup()
+
+    def _process_preview_analysis(self, job_id: str, match_id: str, match: Dict) -> Dict:
+        """Process quick preview analysis on first chunk only"""
+        try:
+            # Get video path
+            team_id = match["team_id"]
+
+            # Import video processor
+            from video_processor import VideoProcessor
+
+            # Initialize video processor
+            processor = VideoProcessor(device=self.device)
+
+            try:
+                # Update progress
+                self._update_job_status(job_id, "running", 10)
+
+                # Run preview analysis on first chunk only
+                logger.info(f"Starting preview analysis for match {match_id}")
+                result = processor.run_preview_analysis(team_id, match_id)
+
+                # Update progress
+                self._update_job_status(job_id, "running", 90)
+
+                # Save preview analysis results
+                if result and result.get("csv_path"):
+                    # Update match with preview analysis path
+                    self.supabase.table("matches").update({
+                        "preview_analysis_path": result["csv_path"],
+                        "preview_analysis_completed_at": datetime.utcnow().isoformat()
+                    }).eq("id", match_id).execute()
+
+                    logger.info(f"Preview analysis completed for match {match_id}: {result['csv_path']}")
+                    return result
+                else:
+                    raise Exception("Preview analysis failed to generate CSV")
+
+            finally:
+                # Clean up processor
+                processor.cleanup()
+
+        except Exception as e:
+            logger.error(f"Preview analysis failed for match {match_id}: {e}")
+            raise
 
     def _get_match_details(self, match_id: str) -> Optional[Dict]:
         """Get match details from database"""

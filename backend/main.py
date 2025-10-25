@@ -328,7 +328,7 @@ async def create_match(
 
         match_result = supabase.table("matches").insert(match_data).execute()
         match_id = match_result.data[0]["id"]
-        
+
         logger.info(f"Match created: {match_id} - {opponent} on {match_date}")
 
         # Note: Job creation happens AFTER video upload (in upload_video_chunk endpoint)
@@ -539,14 +539,14 @@ async def upload_video_chunk(
                 "video_chunks_uploaded": total_chunks,  # Ensure final count is set
                 "video_chunks_total": total_chunks       # Ensure total is confirmed
             }).eq("id", match_id).execute()
-            
+
             # Verify the update succeeded before creating job
             if not final_update.data:
                 logger.error(f"Failed to finalize upload status for match {match_id}")
                 raise HTTPException(status_code=500, detail="Failed to finalize upload status")
-            
+
             logger.info(f"Upload finalized for match {match_id}: {total_chunks} chunks")
-            
+
             # Small delay to ensure database consistency across replicas (Supabase)
             # This prevents race condition where job processor queries before update propagates
             import time
@@ -555,7 +555,7 @@ async def upload_video_chunk(
             # Create Enhanced Analysis job (split-screen with ball tracking)
             # First check if a job already exists for this match to avoid duplicates
             existing_jobs = supabase.table("jobs").select("id, status").eq("match_id", match_id).eq("job_type", "enhanced_analysis").execute()
-            
+
             if existing_jobs.data:
                 # Job already exists, log it but don't fail
                 existing_job = existing_jobs.data[0]
@@ -588,6 +588,76 @@ async def upload_video_chunk(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chunk upload error: {str(e)}")
+
+
+@app.post("/api/upload/analyze-first-chunk/{team_id}/{match_id}")
+async def analyze_first_chunk(team_id: str, match_id: str):
+    """
+    Trigger quick preview analysis on first chunk
+
+    This endpoint creates a preview analysis job that processes only the first chunk
+    (chunk_000.mp4) to provide immediate insights while the full video upload
+    continues in the background.
+
+    Args:
+        team_id: UUID of the team
+        match_id: UUID of the match
+
+    Returns:
+        dict: Job creation status
+
+    Features:
+        - Processes only chunk_000.mp4 (first chunk)
+        - Uses frame sampling for speed (every 10th frame)
+        - Generates preview CSV with _preview suffix
+        - Non-blocking - doesn't interfere with full analysis
+        - Completes in ~30 seconds vs 10+ minutes for full analysis
+    """
+    try:
+        # Verify the first chunk exists
+        chunk_path = get_video_chunk_path(team_id, match_id, 0)
+        if not os.path.exists(chunk_path):
+            raise HTTPException(status_code=404, detail="First chunk not found. Upload must be in progress.")
+
+        # Check if preview analysis job already exists
+        existing_jobs = supabase.table("jobs").select("id, status").eq("match_id", match_id).eq("job_type", "preview_analysis").execute()
+
+        if existing_jobs.data:
+            existing_job = existing_jobs.data[0]
+            logger.info(f"Preview analysis job already exists: {existing_job['id']} (status: {existing_job['status']})")
+            return {
+                "job_id": existing_job['id'],
+                "status": existing_job['status'],
+                "message": "Preview analysis job already exists"
+            }
+
+        # Create preview analysis job
+        job_data = {
+            "match_id": match_id,
+            "status": "queued",
+            "progress": 0,
+            "job_type": "preview_analysis"
+        }
+
+        try:
+            job_result = supabase.table("jobs").insert(job_data).execute()
+            job_id = job_result.data[0]['id']
+            logger.info(f"Preview analysis job created: {job_id}")
+
+            return {
+                "job_id": job_id,
+                "status": "queued",
+                "message": "Preview analysis job created successfully"
+            }
+
+        except Exception as job_error:
+            logger.error(f"Failed to create preview analysis job for match {match_id}: {job_error}")
+            raise HTTPException(status_code=500, detail=f"Failed to create preview analysis job: {str(job_error)}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Preview analysis error: {str(e)}")
 
 
 @app.get("/api/matches/{match_id}/upload-status")

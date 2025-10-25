@@ -203,7 +203,7 @@ class VideoProcessor:
 
     def combine_local_chunks(self, team_id: str, match_id: str, total_chunks: int) -> str:
         """
-        Combine locally stored video chunks into a single video file
+        Combine locally stored video chunks into a single video file using binary concatenation + FFmpeg remuxing
 
         Args:
             team_id: Team ID for the video
@@ -214,102 +214,108 @@ class VideoProcessor:
             str: Path to the combined video file, or None if failed
         """
         try:
-            # Get chunk paths using cross-platform path handling
-            chunk_paths = []
-            for i in range(total_chunks):
-                chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
-                chunk_path = self._normalize_path(chunk_path)
-                if os.path.exists(chunk_path):
+            # Step 1: Concatenate raw chunks into single binary file
+            raw_path = os.path.join("video_storage", team_id, match_id, "raw_concat.mp4")
+            raw_path = self._normalize_path(raw_path)
+            os.makedirs(os.path.dirname(raw_path), exist_ok=True)
+
+            logger.info(f"Concatenating {total_chunks} raw chunks into {raw_path}")
+
+            with open(raw_path, 'wb') as outfile:
+                for i in range(total_chunks):
+                    chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
+                    chunk_path = self._normalize_path(chunk_path)
+
+                    if not os.path.exists(chunk_path):
+                        logger.error(f"Failed to read video chunks: Chunk {i} not found at {chunk_path}")
+                        return None
+
                     chunk_size = os.path.getsize(chunk_path)
-                    logger.info(f"Found chunk {i}: {chunk_path} ({chunk_size} bytes)")
-                    chunk_paths.append(chunk_path)
-                else:
-                    logger.error(f"Chunk not found: {chunk_path}")
-                    return None
+                    logger.info(f"Reading chunk {i}: {chunk_path} ({chunk_size} bytes)")
 
-            if len(chunk_paths) != total_chunks:
-                logger.error(f"Expected {total_chunks} chunks, found {len(chunk_paths)}")
-                return None
+                    with open(chunk_path, 'rb') as infile:
+                        outfile.write(infile.read())
 
-            # Create output path using cross-platform path handling
+            # Verify raw concatenation
+            raw_size = os.path.getsize(raw_path)
+            logger.info(f"Raw concatenated file size: {raw_size} bytes")
+
+            # Step 2: Use FFmpeg to remux into valid MP4
             output_path = os.path.join("video_storage", team_id, match_id, "combined_video.mp4")
             output_path = self._normalize_path(output_path)
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-            # Merge chunks
-            success = self.merge_video_chunks(chunk_paths, output_path)
-            if success:
-                logger.info(f"Video chunks combined successfully: {output_path}")
-                return output_path
-            else:
-                return None
+            logger.info(f"Remuxing raw file into valid MP4: {output_path}")
 
-        except Exception as e:
-            logger.error(f"Error combining local chunks: {e}")
-            return None
-
-    def merge_video_chunks(self, chunk_paths: List[str], output_path: str) -> bool:
-        """
-        Merge video chunks into a single video file using FFmpeg
-
-        Args:
-            chunk_paths: List of paths to video chunks (in order)
-            output_path: Path for the merged video output
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            # Create a temporary file list for FFmpeg with proper path handling
-            file_list_path = os.path.join(self.temp_dir, 'chunk_list.txt')
-            file_list_path = self._normalize_path(file_list_path)
-
-            # Write file list with proper path escaping for cross-platform compatibility
-            with open(file_list_path, 'w', encoding='utf-8') as f:
-                for chunk_path in chunk_paths:
-                    # Use forward slashes for FFmpeg compatibility (works on all platforms)
-                    normalized_path = chunk_path.replace('\\', '/')
-                    f.write(f"file '{normalized_path}'\n")
-
-            # Use FFmpeg to concatenate chunks with proper path handling
             cmd = [
                 self.ffmpeg_path,
-                '-f', 'concat',
-                '-safe', '0',
-                '-i', file_list_path,
+                '-i', raw_path,
                 '-c', 'copy',  # Copy streams without re-encoding
+                '-movflags', '+faststart',  # Optimize for streaming
                 '-y',  # Overwrite output file
                 output_path
             ]
 
-            logger.info(f"Merging {len(chunk_paths)} chunks into {output_path}")
-            logger.info(f"Chunk paths: {chunk_paths}")
-            logger.info(f"File list path: {file_list_path}")
-
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             if result.returncode == 0:
-                logger.info("Video chunks merged successfully")
-                # Verify output file exists and has size
+                logger.info("Video chunks combined successfully using binary concatenation + remuxing")
                 if os.path.exists(output_path):
                     file_size = os.path.getsize(output_path)
                     logger.info(f"Combined video size: {file_size} bytes")
-                return True
+
+                # Clean up raw file
+                try:
+                    os.remove(raw_path)
+                    logger.info("Cleaned up raw concatenated file")
+                except Exception as e:
+                    logger.warning(f"Could not remove raw file: {e}")
+
+                return output_path
             else:
-                logger.error(f"FFmpeg merge failed with return code: {result.returncode}")
+                logger.error(f"Failed to create valid MP4 from uploaded chunks: FFmpeg remux failed with return code {result.returncode}")
                 logger.error(f"FFmpeg stderr: {result.stderr}")
                 logger.error(f"FFmpeg stdout: {result.stdout}")
-                # Log file list contents for debugging
-                try:
-                    with open(file_list_path, 'r') as f:
-                        logger.error(f"File list contents:\n{f.read()}")
-                except Exception as e:
-                    logger.error(f"Could not read file list: {e}")
-                return False
+
+                # Try re-encoding approach for corrupted chunks
+                logger.info("Attempting re-encoding approach for corrupted chunks...")
+                cmd_reencode = [
+                    self.ffmpeg_path,
+                    '-i', raw_path,
+                    '-c:v', 'libx264',  # Re-encode video
+                    '-c:a', 'aac',      # Re-encode audio
+                    '-preset', 'fast',   # Faster encoding
+                    '-movflags', '+faststart',
+                    '-y',  # Overwrite output file
+                    output_path
+                ]
+
+                result_reencode = subprocess.run(cmd_reencode, capture_output=True, text=True)
+
+                if result_reencode.returncode == 0:
+                    logger.info("Video chunks combined successfully with re-encoding")
+                    if os.path.exists(output_path):
+                        file_size = os.path.getsize(output_path)
+                        logger.info(f"Combined video size: {file_size} bytes")
+
+                    # Clean up raw file
+                    try:
+                        os.remove(raw_path)
+                        logger.info("Cleaned up raw concatenated file")
+                    except Exception as e:
+                        logger.warning(f"Could not remove raw file: {e}")
+
+                    return output_path
+                else:
+                    logger.error(f"Failed to create valid MP4 from uploaded chunks: Both copy and re-encode approaches failed")
+                    logger.error(f"FFmpeg re-encode failed with return code: {result_reencode.returncode}")
+                    logger.error(f"FFmpeg re-encode stderr: {result_reencode.stderr}")
+                    logger.error(f"FFmpeg re-encode stdout: {result_reencode.stdout}")
+                    return None
 
         except Exception as e:
-            logger.error(f"Error merging video chunks: {e}")
-            return False
+            logger.error(f"Failed to combine video chunks: Unexpected error during chunk processing: {e}")
+            return None
+
 
     def extract_video_segment(self, video_path: str, start_sec: float, end_sec: float) -> str:
         """
@@ -453,11 +459,16 @@ class VideoProcessor:
 
             if result.returncode == 0:
                 logger.info(f"Enhanced analysis completed successfully")
+
+                # Find the generated CSV file
+                csv_path = self._find_latest_csv_file(match_id)
+
                 # Return the expected output path and a basic analysis dict
                 analysis_data = {
                     "analysis_type": "enhanced_analysis",
                     "summary": "Enhanced split-screen analysis completed",
-                    "video_path": output_path
+                    "video_path": output_path,
+                    "csv_path": csv_path
                 }
                 return output_path, analysis_data
             else:
@@ -593,6 +604,144 @@ class VideoProcessor:
                     "opponent": "4-4-2"
                 }
             }
+
+    def run_preview_analysis(self, team_id: str, match_id: str) -> dict:
+        """
+        Run quick preview analysis on first chunk only
+
+        This method processes only the first chunk (chunk_000.mp4) to provide
+        immediate insights while the full video upload continues in the background.
+
+        Args:
+            team_id: Team ID for the video
+            match_id: Match ID for the video
+
+        Returns:
+            dict: Analysis results with CSV path
+        """
+        try:
+            # Get path to first chunk
+            chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", "chunk_000.mp4")
+            chunk_path = self._normalize_path(chunk_path)
+
+            if not os.path.exists(chunk_path):
+                logger.error(f"First chunk not found: {chunk_path}")
+                return {"error": "First chunk not found"}
+
+            logger.info(f"Running preview analysis on first chunk: {chunk_path}")
+
+            # Create output directory for preview results
+            output_dir = os.path.join("tracking_data")
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Generate timestamp for unique filenames
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # Set up output paths with preview suffix
+            csv_filename = f"positions_preview_{match_id}_{timestamp}.csv"
+            stats_filename = f"stats_preview_{match_id}_{timestamp}.txt"
+            summary_filename = f"summary_preview_{match_id}_{timestamp}.json"
+
+            csv_path = os.path.join(output_dir, csv_filename)
+            stats_path = os.path.join(output_dir, stats_filename)
+            summary_path = os.path.join(output_dir, summary_filename)
+
+            # Run enhanced analysis script in preview mode
+            script_path = os.path.join(VIDEO_ANALYSIS_PATH, "examples", "soccer", "enhanced_supabase_analysis.py")
+
+            cmd = [
+                sys.executable,  # Use current Python interpreter
+                script_path,
+                "--input-video", chunk_path,
+                "--output-csv", csv_path,
+                "--output-stats", stats_path,
+                "--output-summary", summary_path,
+                "--preview-mode",  # Enable preview mode for speed
+                "--device", self.device
+            ]
+
+            logger.info(f"Running preview analysis command: {' '.join(cmd)}")
+
+            # Run the analysis
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=VIDEO_ANALYSIS_PATH)
+
+            if result.returncode == 0:
+                logger.info("Preview analysis completed successfully")
+
+                # Verify output files exist
+                if os.path.exists(csv_path):
+                    file_size = os.path.getsize(csv_path)
+                    logger.info(f"Preview CSV generated: {csv_path} ({file_size} bytes)")
+
+                    return {
+                        "csv_path": csv_path,
+                        "stats_path": stats_path,
+                        "summary_path": summary_path,
+                        "file_size": file_size,
+                        "message": "Preview analysis completed successfully"
+                    }
+                else:
+                    logger.error("Preview analysis completed but CSV file not found")
+                    return {"error": "CSV file not generated"}
+            else:
+                logger.error(f"Preview analysis failed with return code {result.returncode}")
+                logger.error(f"stderr: {result.stderr}")
+                logger.error(f"stdout: {result.stdout}")
+                return {"error": f"Analysis failed: {result.stderr}"}
+
+        except Exception as e:
+            logger.error(f"Preview analysis error: {e}")
+            return {"error": str(e)}
+
+    def _find_latest_csv_file(self, match_id: str) -> str:
+        """
+        Find the latest CSV file generated for a match
+
+        Args:
+            match_id: Match ID to search for
+
+        Returns:
+            str: Path to the latest CSV file, or None if not found
+        """
+        try:
+            import glob
+            from pathlib import Path
+
+            # Look for CSV files in tracking_data directory
+            tracking_dir = Path("tracking_data")
+            if not tracking_dir.exists():
+                return None
+
+            # Search for CSV files (both regular and preview)
+            csv_patterns = [
+                f"positions_{match_id}_*.csv",
+                f"positions_preview_{match_id}_*.csv",
+                f"positions_*.csv"  # Fallback to any positions CSV
+            ]
+
+            latest_file = None
+            latest_time = 0
+
+            for pattern in csv_patterns:
+                csv_files = list(tracking_dir.glob(pattern))
+                for csv_file in csv_files:
+                    if csv_file.is_file():
+                        file_time = csv_file.stat().st_mtime
+                        if file_time > latest_time:
+                            latest_time = file_time
+                            latest_file = str(csv_file)
+
+            if latest_file:
+                logger.info(f"Found latest CSV file: {latest_file}")
+                return latest_file
+            else:
+                logger.warning(f"No CSV file found for match {match_id}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error finding CSV file: {e}")
+            return None
 
     def cleanup(self):
         """Clean up temporary files and directories"""

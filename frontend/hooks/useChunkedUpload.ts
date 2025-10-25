@@ -56,6 +56,19 @@ export const useChunkedUpload = () => {
                 while (retries < maxRetries) {
                     try {
                         await uploadApi.uploadChunk(chunk, chunkIndex, totalChunks, matchId, teamId);
+
+                        // Trigger preview analysis after first chunk upload
+                        if (chunkIndex === 0) {
+                            try {
+                                console.log('Triggering preview analysis for first chunk...');
+                                await uploadApi.analyzeFirstChunk(teamId, matchId);
+                                console.log('Preview analysis job created successfully');
+                            } catch (previewError) {
+                                console.warn('Failed to trigger preview analysis:', previewError);
+                                // Don't fail the upload if preview analysis fails
+                            }
+                        }
+
                         break;
                     } catch (error) {
                         retries++;

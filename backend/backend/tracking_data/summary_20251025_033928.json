@@ -1,0 +1,329 @@
+{
+  "timestamp": "20251025_033928",
+  "total_positions": 8124,
+  "total_frames": 383,
+  "players": {
+    "6": {
+      "jersey": 21,
+      "name": "Player 21",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 6513.35469980315,
+        "y": 5639.38255810675
+      },
+      "position_variance": {
+        "x": 928654.4735040484,
+        "y": 305453.49167428643
+      }
+    },
+    "2": {
+      "jersey": 22,
+      "name": "Player 22",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 5286.048546177822,
+        "y": 5825.690234887631
+      },
+      "position_variance": {
+        "x": 309225.74906961876,
+        "y": 450766.78135855205
+      }
+    },
+    "3": {
+      "jersey": 23,
+      "name": "Player 23",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 380,
+      "avg_position": {
+        "x": 8483.331388774672,
+        "y": 3182.7489232113485
+      },
+      "position_variance": {
+        "x": 5606767.27993466,
+        "y": 2850343.3620393
+      }
+    },
+    "7": {
+      "jersey": 1,
+      "name": "James Wilson",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 4564.317553262385,
+        "y": 3782.4650513656497
+      },
+      "position_variance": {
+        "x": 1934537.8837312525,
+        "y": 390802.0217030544
+      }
+    },
+    "16": {
+      "jersey": 2,
+      "name": "Player 2",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 379,
+      "avg_position": {
+        "x": 5654.660527614302,
+        "y": 3310.8718155430615
+      },
+      "position_variance": {
+        "x": 2363342.0667079305,
+        "y": 376388.8116353391
+      }
+    },
+    "11": {
+      "jersey": 3,
+      "name": "Player 3",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 378,
+      "avg_position": {
+        "x": 7379.854162791418,
+        "y": 4986.979583901703
+      },
+      "position_variance": {
+        "x": 442943.79317146447,
+        "y": 829664.6611917025
+      }
+    },
+    "4": {
+      "jersey": 24,
+      "name": "Player 24",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 7318.958858780347,
+        "y": 3910.9830876548144
+      },
+      "position_variance": {
+        "x": 1061606.557249021,
+        "y": 215488.43876568656
+      }
+    },
+    "10": {
+      "jersey": 25,
+      "name": "Player 25",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 5129.659859564674,
+        "y": 4223.481968196358
+      },
+      "position_variance": {
+        "x": 1617554.519649219,
+        "y": 733919.1525767192
+      }
+    },
+    "8": {
+      "jersey": 26,
+      "name": "Player 26",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 7295.483007556184,
+        "y": 4827.074694856258
+      },
+      "position_variance": {
+        "x": 301308.1229742661,
+        "y": 470563.10844696226
+      }
+    },
+    "9": {
+      "jersey": 27,
+      "name": "Player 27",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 6172.271477326321,
+        "y": 2500.575905627153
+      },
+      "position_variance": {
+        "x": 14402412.53790576,
+        "y": 6389363.19097382
+      }
+    },
+    "14": {
+      "jersey": 28,
+      "name": "Player 28",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 4681.103924448409,
+        "y": 4344.510730012508
+      },
+      "position_variance": {
+        "x": 1240180.3122960632,
+        "y": 305546.6813315316
+      }
+    },
+    "17": {
+      "jersey": 4,
+      "name": "David Chen",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 5601.1688517573,
+        "y": 5561.215643454724
+      },
+      "position_variance": {
+        "x": 556906.8408371264,
+        "y": 384886.90006141085
+      }
+    },
+    "12": {
+      "jersey": 29,
+      "name": "Player 29",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 8883.787915487615,
+        "y": 4818.993767685777
+      },
+      "position_variance": {
+        "x": 444313.96821280767,
+        "y": 347204.49483688566
+      }
+    },
+    "15": {
+      "jersey": 5,
+      "name": "Ryan Smith",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 4711.6906488373525,
+        "y": 3146.4880761975064
+      },
+      "position_variance": {
+        "x": 3016645.2138701524,
+        "y": 408679.4108354763
+      }
+    },
+    "19": {
+      "jersey": 6,
+      "name": "Player 6",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 7792.100703842683,
+        "y": 3339.2130809393457
+      },
+      "position_variance": {
+        "x": 1170260.46046529,
+        "y": 325598.3870064395
+      }
+    },
+    "13": {
+      "jersey": 7,
+      "name": "Player 7",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 378,
+      "avg_position": {
+        "x": 6861.29474748884,
+        "y": 4690.334929289641
+      },
+      "position_variance": {
+        "x": 396274.0700160339,
+        "y": 402646.99982823303
+      }
+    },
+    "20": {
+      "jersey": 8,
+      "name": "Player 8",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 381,
+      "avg_position": {
+        "x": 5012.885416025878,
+        "y": 5190.419511129224
+      },
+      "position_variance": {
+        "x": 544497.7600546335,
+        "y": 558356.224838654
+      }
+    },
+    "18": {
+      "jersey": 9,
+      "name": "Alex Rodriguez",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 378,
+      "avg_position": {
+        "x": 4693.959356398809,
+        "y": 4433.116177997892
+      },
+      "position_variance": {
+        "x": 1084901.704384311,
+        "y": 372417.3659102567
+      }
+    },
+    "22": {
+      "jersey": 30,
+      "name": "Player 30",
+      "team_id": "2be1da66-3051-4084-afe3-b11250e3827b",
+      "frames_tracked": 198,
+      "avg_position": {
+        "x": 6162.738407019413,
+        "y": 4225.350777057686
+      },
+      "position_variance": {
+        "x": 1403224.5124465213,
+        "y": 438876.28315560194
+      }
+    },
+    "23": {
+      "jersey": 10,
+      "name": "Marcus Johnson",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 373,
+      "avg_position": {
+        "x": 5078.501280265583,
+        "y": 3695.124228960707
+      },
+      "position_variance": {
+        "x": 2235191.8869307316,
+        "y": 263275.0675397325
+      }
+    },
+    "5": {
+      "jersey": 11,
+      "name": "Player 11",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 5,
+      "avg_position": {
+        "x": 5722.7900390625,
+        "y": 4399.22275390625
+      },
+      "position_variance": {
+        "x": 1236782.782980442,
+        "y": 14435.96571191788
+      }
+    },
+    "25": {
+      "jersey": 12,
+      "name": "Player 12",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 218,
+      "avg_position": {
+        "x": 1875.847621532755,
+        "y": 4036.4218078053327
+      },
+      "position_variance": {
+        "x": 61522.74508012423,
+        "y": 95283.52907929601
+      }
+    },
+    "27": {
+      "jersey": 13,
+      "name": "Player 13",
+      "team_id": "e1235fa0-0f06-4aa8-b9ee-71a360d3a982",
+      "frames_tracked": 140,
+      "avg_position": {
+        "x": 5107.70733468192,
+        "y": 3760.8020368303573
+      },
+      "position_variance": {
+        "x": 415068.56636835664,
+        "y": 145434.6101628564
+      }
+    }
+  }
+}

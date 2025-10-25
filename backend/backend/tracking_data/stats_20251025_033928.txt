@@ -1,0 +1,150 @@
+============================================================
+TRACKING DATA ANALYSIS REPORT
+============================================================
+
+Generated: 20251025_033928
+Total Positions Tracked: 8124
+Total Players: 23
+
+------------------------------------------------------------
+PLAYER STATISTICS
+------------------------------------------------------------
+
+Player: James Wilson (Jersey #1)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 381
+  Average Position: (4564.32, 3782.47)
+  Position Range: X=[3384.40, 7794.35], Y=[2648.50, 5861.51]
+
+Player: Player 2 (Jersey #2)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 379
+  Average Position: (5654.66, 3310.87)
+  Position Range: X=[-1011.86, 10490.40], Y=[1396.50, 5853.18]
+
+Player: Player 3 (Jersey #3)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 378
+  Average Position: (7379.85, 4986.98)
+  Position Range: X=[5726.12, 9446.96], Y=[3208.77, 7268.23]
+
+Player: David Chen (Jersey #4)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 381
+  Average Position: (5601.17, 5561.22)
+  Position Range: X=[4167.77, 7866.69], Y=[4413.54, 8418.78]
+
+Player: Ryan Smith (Jersey #5)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 381
+  Average Position: (4711.69, 3146.49)
+  Position Range: X=[2723.91, 8693.09], Y=[2082.85, 5873.26]
+
+Player: Player 6 (Jersey #6)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 381
+  Average Position: (7792.10, 3339.21)
+  Position Range: X=[2446.42, 10773.75], Y=[2499.03, 5855.88]
+
+Player: Player 7 (Jersey #7)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 378
+  Average Position: (6861.29, 4690.33)
+  Position Range: X=[5629.84, 9133.57], Y=[3158.63, 6857.84]
+
+Player: Player 8 (Jersey #8)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 381
+  Average Position: (5012.89, 5190.42)
+  Position Range: X=[3987.16, 7839.69], Y=[3970.78, 7414.25]
+
+Player: Alex Rodriguez (Jersey #9)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 378
+  Average Position: (4693.96, 4433.12)
+  Position Range: X=[3595.68, 7830.88], Y=[3228.84, 6726.38]
+
+Player: Marcus Johnson (Jersey #10)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 373
+  Average Position: (5078.50, 3695.12)
+  Position Range: X=[3633.84, 8483.94], Y=[2983.74, 5855.21]
+
+Player: Player 11 (Jersey #11)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 5
+  Average Position: (5722.79, 4399.22)
+  Position Range: X=[5037.23, 7935.39], Y=[4163.07, 4484.71]
+
+Player: Player 12 (Jersey #12)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 218
+  Average Position: (1875.85, 4036.42)
+  Position Range: X=[1409.50, 4969.52], Y=[3833.95, 6870.24]
+
+Player: Player 13 (Jersey #13)
+  Team ID: e1235fa0-0f06-4aa8-b9ee-71a360d3a982
+  Frames Tracked: 140
+  Average Position: (5107.71, 3760.80)
+  Position Range: X=[4647.68, 8656.41], Y=[3130.01, 5637.20]
+
+Player: Player 21 (Jersey #21)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (6513.35, 5639.38)
+  Position Range: X=[5351.65, 9142.86], Y=[4073.81, 7644.21]
+
+Player: Player 22 (Jersey #22)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (5286.05, 5825.69)
+  Position Range: X=[4508.24, 7859.10], Y=[4446.55, 9163.98]
+
+Player: Player 23 (Jersey #23)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 380
+  Average Position: (8483.33, 3182.75)
+  Position Range: X=[-10720.48, 47384.30], Y=[-4779.08, 33127.20]
+
+Player: Player 24 (Jersey #24)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (7318.96, 3910.98)
+  Position Range: X=[4723.37, 10064.93], Y=[3116.38, 6141.39]
+
+Player: Player 25 (Jersey #25)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (5129.66, 4223.48)
+  Position Range: X=[4008.02, 8157.69], Y=[1960.91, 6038.87]
+
+Player: Player 26 (Jersey #26)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (7295.48, 4827.07)
+  Position Range: X=[5736.47, 9175.72], Y=[3181.33, 6797.85]
+
+Player: Player 27 (Jersey #27)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (6172.27, 2500.58)
+  Position Range: X=[2492.91, 65861.91], Y=[-1776.34, 48374.74]
+
+Player: Player 28 (Jersey #28)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (4681.10, 4344.51)
+  Position Range: X=[3573.95, 7871.33], Y=[3682.36, 6859.78]
+
+Player: Player 29 (Jersey #29)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 381
+  Average Position: (8883.79, 4818.99)
+  Position Range: X=[5715.35, 10008.81], Y=[3592.23, 7213.76]
+
+Player: Player 30 (Jersey #30)
+  Team ID: 2be1da66-3051-4084-afe3-b11250e3827b
+  Frames Tracked: 198
+  Average Position: (6162.74, 4225.35)
+  Position Range: X=[4877.83, 8508.55], Y=[3000.06, 6359.56]
+

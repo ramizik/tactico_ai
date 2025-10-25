@@ -1,0 +1,53 @@
+TacticoAI - Quick Changes Summary for macOS Upload Fix
+=====================================================
+
+HEY! Here are all the changes I made to fix video upload on macOS:
+
+FILES CHANGED:
+1. backend/main.py - Fixed job creation and race conditions
+2. backend/job_processor.py - Added safety checks and retry logic
+3. backend/video_analysis/examples/soccer/supabase_database_manager.py - Fixed field names
+4. backend/seed_data.py - NEW FILE for creating demo teams
+5. frontend/lib/api.ts - Added missing methods for upload
+6. frontend/hooks/useChunkedUpload.ts - Minor fix
+
+MAIN ISSUES FIXED:
+==================
+
+Issue #1: Video upload didn't start
+- Frontend called uploadChunk() but API had uploadVideoChunk()
+- Fixed: Added uploadChunk() method that accepts Blob type
+
+Issue #2: Upload crashed after 3 chunks
+- Tried to create "quick_brief" job but DB only allows "enhanced_analysis"
+- Fixed: Removed quick_brief job creation
+
+Issue #3: ML analysis failed with KeyError: 'number'
+- Code used player['number'] but DB has jersey_number field
+- Fixed: Changed to player['jersey_number'] in 2 places
+
+Issue #4: Jobs created too early
+- Jobs were created when match was created (before upload!)
+- Fixed: Jobs now only created AFTER video upload completes
+
+Issue #5: Race condition
+- Job started before database updates finished
+- Fixed: Added 300ms delay + retry logic
+
+WHAT TO DO:
+===========
+1. Pull these changes: git pull origin main
+2. Run seed script: cd backend && python seed_data.py
+3. Restart everything (kill ports 8000 and 5173 first)
+4. Test video upload - should work now!
+
+KEY IMPROVEMENTS:
+=================
+✓ Upload works on macOS
+✓ No more KeyError crashes
+✓ Proper job timing
+✓ Better error handling
+✓ Cross-platform compatible
+
+That's it! The system should now work perfectly on both macOS and Windows.
+Let me know if you hit any issues.

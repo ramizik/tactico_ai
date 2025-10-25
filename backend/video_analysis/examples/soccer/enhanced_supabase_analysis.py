@@ -370,7 +370,11 @@ def process_enhanced_video_analysis(
     device: str = 'cpu',
     max_frames: int = None,
     export_local: bool = True,
-    show_preview: bool = False
+    show_preview: bool = False,
+    preview_mode: bool = False,
+    output_csv: str = None,
+    output_stats: str = None,
+    output_summary: str = None
 ) -> tuple:
     """
     Process video with enhanced analysis and Supabase integration
@@ -402,7 +406,20 @@ def process_enhanced_video_analysis(
     db.connect()
 
     # Initialize local exporter
-    exporter = LocalDataExporter(output_dir=tracking_data_dir) if export_local else None
+    if export_local:
+        if preview_mode and output_csv:
+            # Use custom paths for preview mode
+            exporter = LocalDataExporter(
+                output_dir=os.path.dirname(output_csv),
+                custom_csv_path=output_csv,
+                custom_stats_path=output_stats,
+                custom_summary_path=output_summary
+            )
+        else:
+            # Use default paths
+            exporter = LocalDataExporter(output_dir=tracking_data_dir)
+    else:
+        exporter = None
 
     try:
         # Setup match context
@@ -857,10 +874,26 @@ def main():
     parser = argparse.ArgumentParser(
         description="Enhanced Split-Screen Soccer Analysis with Supabase"
     )
-    parser.add_argument("--source_video_path", type=str, required=True,
+
+    # Legacy arguments (for backward compatibility)
+    parser.add_argument("--source_video_path", type=str,
+                       help="Path to input video (legacy)")
+    parser.add_argument("--match_id", type=str,
+                       help="Match ID from Supabase (legacy)")
+
+    # New arguments (for video processor integration)
+    parser.add_argument("--input-video", type=str,
                        help="Path to input video")
-    parser.add_argument("--match_id", type=str, required=True,
-                       help="Match ID from Supabase")
+    parser.add_argument("--output-csv", type=str,
+                       help="Path to output CSV file")
+    parser.add_argument("--output-stats", type=str,
+                       help="Path to output stats file")
+    parser.add_argument("--output-summary", type=str,
+                       help="Path to output summary file")
+    parser.add_argument("--preview-mode", action="store_true",
+                       help="Enable preview mode for faster processing")
+
+    # Common arguments
     parser.add_argument("--device", type=str, default="cpu",
                        help="Device: cpu, cuda, or mps")
     parser.add_argument("--max_frames", type=int, default=None,
@@ -872,17 +905,55 @@ def main():
 
     args = parser.parse_args()
 
-    video_path, analysis_data = process_enhanced_video_analysis(
-        source_path=args.source_video_path,
-        match_id=args.match_id,
-        device=args.device,
-        max_frames=args.max_frames,
-        export_local=args.export_local,
-        show_preview=args.show_preview
-    )
+    # Determine which interface to use
+    if args.input_video:
+        # New interface (from video processor)
+        source_path = args.input_video
+        match_id = "preview_analysis"  # Dummy match ID for preview
+        export_local = True  # Always export for preview mode
 
-    print(f"\n✓ Video saved: {video_path}")
-    print(f"✓ Analysis complete: {analysis_data['summary']}")
+        # Adjust max_frames for preview mode
+        max_frames = args.max_frames
+        if args.preview_mode and max_frames is None:
+            max_frames = 300  # Process only first 300 frames for speed
+
+        video_path, analysis_data = process_enhanced_video_analysis(
+            source_path=source_path,
+            match_id=match_id,
+            device=args.device,
+            max_frames=max_frames,
+            export_local=export_local,
+            show_preview=args.show_preview,
+            preview_mode=args.preview_mode,
+            output_csv=args.output_csv,
+            output_stats=args.output_stats,
+            output_summary=args.output_summary
+        )
+
+        print(f"\n✓ Preview analysis complete")
+        if args.output_csv:
+            print(f"✓ CSV saved: {args.output_csv}")
+        if args.output_stats:
+            print(f"✓ Stats saved: {args.output_stats}")
+        if args.output_summary:
+            print(f"✓ Summary saved: {args.output_summary}")
+
+    else:
+        # Legacy interface
+        if not args.source_video_path or not args.match_id:
+            parser.error("Either --source_video_path and --match_id (legacy) or --input-video (new) must be provided")
+
+        video_path, analysis_data = process_enhanced_video_analysis(
+            source_path=args.source_video_path,
+            match_id=args.match_id,
+            device=args.device,
+            max_frames=args.max_frames,
+            export_local=args.export_local,
+            show_preview=args.show_preview
+        )
+
+        print(f"\n✓ Video saved: {video_path}")
+        print(f"✓ Analysis complete: {analysis_data['summary']}")
 
 if __name__ == "__main__":
     main()
