@@ -370,7 +370,8 @@ def process_enhanced_video_analysis(
     device: str = 'cpu',
     max_frames: int = None,
     export_local: bool = True,
-    show_preview: bool = False
+    show_preview: bool = False,
+    analysis_scope: str = 'full'
 ) -> tuple:
     """
     Process video with enhanced analysis and Supabase integration
@@ -382,6 +383,7 @@ def process_enhanced_video_analysis(
         max_frames: Maximum frames to process (None for all)
         export_local: Export local CSV/JSON/TXT files
         show_preview: Show live preview window during processing
+        analysis_scope: Scope of analysis ('preview' or 'full')
 
     Returns:
         tuple: (local_video_path, analysis_json_data)
@@ -394,15 +396,18 @@ def process_enhanced_video_analysis(
     tracking_data_dir = os.path.join('backend', 'tracking_data')
     os.makedirs(tracking_data_dir, exist_ok=True)
 
-    # Output video path
-    target_path = os.path.join(video_output_dir, f'enhanced_{match_id}.mp4')
+    # Output video path - add prefix for preview
+    output_prefix = "preview_" if analysis_scope == "preview" else ""
+    target_path = os.path.join(video_output_dir, f'{output_prefix}enhanced_{match_id}.mp4')
 
     # Connect to Supabase
     db = SupabaseDatabaseManager()
     db.connect()
 
-    # Initialize local exporter
-    exporter = LocalDataExporter(output_dir=tracking_data_dir) if export_local else None
+    # Initialize local exporter with prefix
+    exporter = None
+    if export_local:
+        exporter = LocalDataExporter(output_dir=tracking_data_dir, output_prefix=output_prefix)
 
     try:
         # Setup match context
@@ -650,14 +655,15 @@ def process_enhanced_video_analysis(
 
                                 # Add to database batch
                                 position_batch.append({
-                                    'frame_id': frame_idx,
-                                    'timestamp': float(timestamp_sec),
+                                    'frame_number': frame_idx,
+                                    'timestamp_seconds': float(timestamp_sec),
                                     'jersey_number': str(jersey_num),
                                     'team_id': team_id,
                                     'x': float(pitch_xy[0]),
                                     'y': float(pitch_xy[1]),
                                     'confidence': confidence,
-                                    'tracker_id': int(tracker_id)
+                                    'tracker_id': int(tracker_id),
+                                    'analysis_scope': analysis_scope
                                 })
 
                                 # Export locally
@@ -702,14 +708,15 @@ def process_enhanced_video_analysis(
 
                             # Add ball to database batch
                             position_batch.append({
-                                'frame_id': frame_idx,
-                                'timestamp': float(timestamp_sec),
+                                'frame_number': frame_idx,
+                                'timestamp_seconds': float(timestamp_sec),
                                 'jersey_number': 'BALL',
                                 'team_id': None,
                                 'x': float(ball_pitch[0]),
                                 'y': float(ball_pitch[1]),
                                 'confidence': ball_confidence,
-                                'tracker_id': -1
+                                'tracker_id': -1,
+                                'analysis_scope': analysis_scope
                             })
 
                             # Export ball data locally
@@ -869,6 +876,8 @@ def main():
                        help="Export tracking data to local CSV/JSON files")
     parser.add_argument("--show_preview", action="store_true",
                        help="Show live preview window during processing")
+    parser.add_argument("--analysis_scope", type=str, default="full",
+                       help="Scope of analysis: 'preview' or 'full'")
 
     args = parser.parse_args()
 
@@ -878,7 +887,8 @@ def main():
         device=args.device,
         max_frames=args.max_frames,
         export_local=args.export_local,
-        show_preview=args.show_preview
+        show_preview=args.show_preview,
+        analysis_scope=args.analysis_scope
     )
 
     print(f"\n✓ Video saved: {video_path}")

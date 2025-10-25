@@ -248,6 +248,53 @@ class VideoProcessor:
             logger.error(f"Error combining local chunks: {e}")
             return None
 
+    def combine_preview_chunks(self, team_id: str, match_id: str, preview_chunks: int) -> str:
+        """
+        Combine only the first N chunks for preview analysis
+
+        Args:
+            team_id: Team ID for the video
+            match_id: Match ID for the video
+            preview_chunks: Number of chunks to combine for preview (typically 10)
+
+        Returns:
+            str: Path to the combined preview video file, or None if failed
+        """
+        try:
+            # Get chunk paths using cross-platform path handling
+            chunk_paths = []
+            for i in range(preview_chunks):
+                chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
+                chunk_path = self._normalize_path(chunk_path)
+                if os.path.exists(chunk_path):
+                    chunk_size = os.path.getsize(chunk_path)
+                    logger.info(f"Found preview chunk {i}: {chunk_path} ({chunk_size} bytes)")
+                    chunk_paths.append(chunk_path)
+                else:
+                    logger.error(f"Preview chunk not found: {chunk_path}")
+                    return None
+
+            if len(chunk_paths) != preview_chunks:
+                logger.error(f"Expected {preview_chunks} preview chunks, found {len(chunk_paths)}")
+                return None
+
+            # Create output path for preview video
+            output_path = os.path.join("video_storage", team_id, match_id, "preview_video.mp4")
+            output_path = self._normalize_path(output_path)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+            # Merge preview chunks
+            success = self.merge_video_chunks(chunk_paths, output_path)
+            if success:
+                logger.info(f"Preview video chunks combined successfully: {output_path}")
+                return output_path
+            else:
+                return None
+
+        except Exception as e:
+            logger.error(f"Error combining preview chunks: {e}")
+            return None
+
     def merge_video_chunks(self, chunk_paths: List[str], output_path: str) -> bool:
         """
         Merge video chunks into a single video file using FFmpeg
@@ -406,19 +453,20 @@ class VideoProcessor:
             logger.error(f"Error in full analysis: {e}")
             return {"error": str(e)}
 
-    def run_enhanced_analysis(self, video_path: str, match_id: str) -> tuple:
+    def run_enhanced_analysis(self, video_path: str, match_id: str, analysis_scope: str = "full") -> tuple:
         """
         Run enhanced split-screen analysis with ball tracking
 
         Args:
             video_path: Path to the video file
             match_id: Match ID from Supabase
+            analysis_scope: Scope of analysis ('preview' or 'full')
 
         Returns:
             tuple: (local_video_path, analysis_dict)
         """
         try:
-            logger.info("Starting enhanced analysis with split-screen output")
+            logger.info(f"Starting enhanced analysis ({analysis_scope}) with split-screen output")
             logger.info("Live preview window will open automatically")
 
             # Set up environment and run enhanced analysis
@@ -433,10 +481,11 @@ class VideoProcessor:
             else:
                 env['PYTHONPATH'] = VIDEO_ANALYSIS_PATH
 
-            # Output path for enhanced video
+            # Output path for enhanced video - add prefix for preview
             output_dir = os.path.join('backend', 'video_outputs')
             os.makedirs(output_dir, exist_ok=True)
-            output_path = os.path.join(output_dir, f'enhanced_{match_id}.mp4')
+            output_prefix = "preview_" if analysis_scope == "preview" else ""
+            output_path = os.path.join(output_dir, f'{output_prefix}enhanced_{match_id}.mp4')
 
             cmd = [
                 sys.executable,
@@ -445,7 +494,8 @@ class VideoProcessor:
                 '--match_id', match_id,
                 '--device', self.device,
                 '--export_local',
-                '--show_preview'  # Always show live preview window
+                '--show_preview',  # Always show live preview window
+                '--analysis_scope', analysis_scope  # Pass scope to analysis script
             ]
 
             logger.info(f"Running enhanced analysis with command: {' '.join(cmd)}")

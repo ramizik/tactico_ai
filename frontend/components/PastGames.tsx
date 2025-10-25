@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Plus, Video, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Maximize2, Minimize2, Plus, Video, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import goalkeeperImage from '../assets/e182018dfac45d64e40e055e6351b8c34ba96aeb.png';
 import { useSession } from '../contexts/SessionContext';
@@ -7,6 +7,7 @@ import { matchesApi } from '../lib/api';
 import type { Match } from '../types/api';
 import { AddMatch } from './AddMatch';
 import { AIChat } from './AIChat';
+import DualAnalysisProgress from './DualAnalysisProgress';
 import { SportSwitcher } from './SportSwitcher';
 
 export const PastGames = () => {
@@ -20,6 +21,7 @@ export const PastGames = () => {
   const [videoPosition, setVideoPosition] = useState({ x: 100, y: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
 
   // Load matches from backend
@@ -191,55 +193,101 @@ export const PastGames = () => {
                   </thead>
                   <tbody>
                     {matches.map((match) => (
-                      <tr
-                        key={match.id}
-                        className="border-b-2 hover:bg-gray-50 transition-colors"
-                        style={{ borderColor: '#e5e5e5' }}
-                      >
-                        <td className="p-4" style={{ fontWeight: 600 }}>
-                          {new Date(match.match_date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </td>
-                        <td className="p-4" style={{ fontWeight: 800 }}>
-                          vs {match.opponent}
-                        </td>
-                        <td className="p-4">
-                          <span
-                            className="px-3 py-1 text-xs font-bold rounded"
-                            style={{
-                              backgroundColor:
-                                match.status === 'analyzed' ? '#22c55e' :
-                                  match.status === 'processing' ? '#f59e0b' :
-                                    match.status === 'uploading' ? '#3b82f6' :
-                                      match.status === 'failed' ? '#ef4444' : '#6b7280',
-                              color: 'white'
-                            }}
-                          >
-                            {match.status.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          {match.status === 'analyzed' && match.analyses?.[0]?.enhanced_video_path ? (
-                            <button
-                              onClick={() => setSelectedGame(match)}
-                              className="flex items-center gap-2 px-4 py-2 text-white transition-all hover:scale-105"
-                              style={{ backgroundColor: theme.accent, fontWeight: 800 }}
+                      <>
+                        <tr
+                          key={match.id}
+                          className="border-b-2 hover:bg-gray-50 transition-colors"
+                          style={{ borderColor: '#e5e5e5' }}
+                        >
+                          <td className="p-4" style={{ fontWeight: 600 }}>
+                            {new Date(match.match_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </td>
+                          <td className="p-4" style={{ fontWeight: 800 }}>
+                            vs {match.opponent}
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className="px-3 py-1 text-xs font-bold rounded"
+                              style={{
+                                backgroundColor:
+                                  match.status === 'analyzed' ? '#22c55e' :
+                                    match.status === 'processing' ? '#f59e0b' :
+                                      match.status === 'uploading' ? '#3b82f6' :
+                                        match.status === 'failed' ? '#ef4444' : '#6b7280',
+                                color: 'white'
+                              }}
                             >
-                              <Video className="w-4 h-4" />
-                              Watch
-                            </button>
-                          ) : (
-                            <span className="text-gray-400 text-sm">
-                              {match.status === 'processing' ? 'Processing...' :
-                                match.status === 'uploading' ? 'Uploading...' :
-                                  match.status === 'failed' ? 'Failed' : 'Pending'}
+                              {match.status.toUpperCase()}
                             </span>
-                          )}
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="p-4">
+                            {match.status === 'analyzed' && match.analyses?.[0]?.enhanced_video_path ? (
+                              <button
+                                onClick={() => setSelectedGame(match)}
+                                className="flex items-center gap-2 px-4 py-2 text-white transition-all hover:scale-105"
+                                style={{ backgroundColor: theme.accent, fontWeight: 800 }}
+                              >
+                                <Video className="w-4 h-4" />
+                                Watch
+                              </button>
+                            ) : match.status === 'processing' || match.status === 'uploading' ? (
+                              <button
+                                onClick={() => setExpandedMatchId(expandedMatchId === match.id ? null : match.id)}
+                                className="flex items-center gap-2 px-4 py-2 border-2 transition-all hover:bg-gray-100"
+                                style={{ borderColor: theme.accent, fontWeight: 800 }}
+                              >
+                                {expandedMatchId === match.id ? (
+                                  <>
+                                    <ChevronUp className="w-4 h-4" />
+                                    Hide Progress
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="w-4 h-4" />
+                                    View Progress
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 text-sm">
+                                {match.status === 'failed' ? 'Failed' : 'Pending'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Expanded Progress View */}
+                        {expandedMatchId === match.id && (match.status === 'processing' || match.status === 'uploading') && (
+                          <tr key={`${match.id}-progress`}>
+                            <td colSpan={4} className="p-6 bg-gray-50" style={{ borderColor: '#e5e5e5' }}>
+                              <DualAnalysisProgress
+                                matchId={match.id}
+                                onPreviewComplete={() => {
+                                  // Reload matches to update status
+                                  if (teamId) {
+                                    matchesApi.getTeamMatches(teamId, 20)
+                                      .then(setMatches)
+                                      .catch(console.error);
+                                  }
+                                }}
+                                onFullComplete={() => {
+                                  // Reload matches to update status and collapse
+                                  if (teamId) {
+                                    matchesApi.getTeamMatches(teamId, 20)
+                                      .then(setMatches)
+                                      .catch(console.error);
+                                  }
+                                  setExpandedMatchId(null);
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))}
                   </tbody>
                 </table>

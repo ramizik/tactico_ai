@@ -13,6 +13,9 @@ from datetime import datetime
 import uuid
 import shutil
 from pathlib import Path
+import signal
+import sys
+import atexit
 
 # Load environment variables
 load_dotenv()
@@ -328,7 +331,7 @@ async def create_match(
 
         match_result = supabase.table("matches").insert(match_data).execute()
         match_id = match_result.data[0]["id"]
-        
+
         logger.info(f"Match created: {match_id} - {opponent} on {match_date}")
 
         # Note: Job creation happens AFTER video upload (in upload_video_chunk endpoint)
@@ -415,6 +418,51 @@ async def get_match_analysis(match_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/api/matches/{match_id}/analysis-status")
+async def get_analysis_status(match_id: str):
+    """
+    Get status for both preview and full analyses
+
+    Returns combined status of preview (5 min) and full (90 min) analysis jobs
+    for real-time progress tracking in the frontend.
+    """
+    try:
+        # Get all jobs for this match
+        jobs = supabase.table("jobs").select("*").eq("match_id", match_id).execute()
+
+        status = {
+            "preview": None,
+            "full": None
+        }
+
+        for job in jobs.data:
+            scope = job.get("analysis_scope", "full")
+            if scope in ["preview", "full"]:
+                status[scope] = {
+                    "job_id": job["id"],
+                    "status": job["status"],
+                    "progress": job["progress"],
+                    "error": job.get("error_message"),
+                    "updated_at": job["updated_at"],
+                    "started_at": job.get("started_at"),
+                    "completed_at": job.get("completed_at")
+                }
+
+        # Get analysis results if completed
+        analyses = supabase.table("analyses").select("*").eq("match_id", match_id).execute()
+
+        for analysis in analyses.data:
+            scope = analysis.get("analysis_scope", "full")
+            if scope in ["preview", "full"] and status[scope]:
+                status[scope]["has_results"] = True
+                status[scope]["analysis_id"] = analysis["id"]
+
+        return status
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting analysis status: {str(e)}")
 
 
 # ==================== Storage Endpoints ====================
@@ -527,10 +575,33 @@ async def upload_video_chunk(
         if not update_result.data:
             raise HTTPException(status_code=404, detail="Match not found")
 
-        # Note: Quick Brief analysis removed - only Enhanced Analysis is supported
-        # Enhanced Analysis job is created after all chunks are uploaded (see below)
+        # Trigger preview analysis after receiving enough chunks for ~5 minutes
+        # For shorter videos, use half the chunks; for longer videos, use up to 10 chunks
+        PREVIEW_CHUNK_THRESHOLD = min(10, max(1, total_chunks // 2))  # At least 1, at most 10 chunks
 
-        # Check if all chunks uploaded (trigger Enhanced Analysis)
+        # Create preview job when we reach the preview threshold
+        # Only create if video has at least 2 chunks (to ensure preview is different from full)
+        if chunk_index == PREVIEW_CHUNK_THRESHOLD - 1 and total_chunks >= 2:
+            # Check if preview job already exists
+            existing_preview = supabase.table("jobs").select("id").eq("match_id", match_id).eq("analysis_scope", "preview").execute()
+
+            if not existing_preview.data:
+                preview_job_data = {
+                    "match_id": match_id,
+                    "status": "queued",
+                    "progress": 0,
+                    "job_type": "enhanced_analysis",
+                    "analysis_scope": "preview",
+                    "video_segment_start": 0,
+                    "video_segment_end": PREVIEW_CHUNK_THRESHOLD
+                }
+                try:
+                    preview_result = supabase.table("jobs").insert(preview_job_data).execute()
+                    logger.info(f"Preview analysis job created: {preview_result.data[0]['id']} for {PREVIEW_CHUNK_THRESHOLD}/{total_chunks} chunks")
+                except Exception as job_error:
+                    logger.error(f"Failed to create preview job for match {match_id}: {job_error}")
+
+        # Check if all chunks uploaded (trigger Full Analysis)
         if chunk_index == total_chunks - 1:  # Last chunk
             # Update upload status and ensure chunk counts are finalized
             # Consolidate into single update to avoid race conditions
@@ -539,14 +610,14 @@ async def upload_video_chunk(
                 "video_chunks_uploaded": total_chunks,  # Ensure final count is set
                 "video_chunks_total": total_chunks       # Ensure total is confirmed
             }).eq("id", match_id).execute()
-            
+
             # Verify the update succeeded before creating job
             if not final_update.data:
                 logger.error(f"Failed to finalize upload status for match {match_id}")
                 raise HTTPException(status_code=500, detail="Failed to finalize upload status")
-            
+
             logger.info(f"Upload finalized for match {match_id}: {total_chunks} chunks")
-            
+
             # Small delay to ensure database consistency across replicas (Supabase)
             # This prevents race condition where job processor queries before update propagates
             import time
@@ -555,18 +626,21 @@ async def upload_video_chunk(
             # Create Enhanced Analysis job (split-screen with ball tracking)
             # First check if a job already exists for this match to avoid duplicates
             existing_jobs = supabase.table("jobs").select("id, status").eq("match_id", match_id).eq("job_type", "enhanced_analysis").execute()
-            
+
             if existing_jobs.data:
                 # Job already exists, log it but don't fail
                 existing_job = existing_jobs.data[0]
                 logger.info(f"Enhanced analysis job already exists: {existing_job['id']} (status: {existing_job['status']})")
             else:
-                # Create new job
+                # Create new job for full analysis
                 job_data = {
                     "match_id": match_id,
                     "status": "queued",
                     "progress": 0,
-                    "job_type": "enhanced_analysis"  # Using new enhanced analysis
+                    "job_type": "enhanced_analysis",  # Using new enhanced analysis
+                    "analysis_scope": "full",
+                    "video_segment_start": 0,
+                    "video_segment_end": total_chunks
                 }
                 try:
                     job_result = supabase.table("jobs").insert(job_data).execute()
@@ -801,6 +875,100 @@ async def test_letta():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Letta AI test failed: {str(e)}")
+
+
+# ==================== Cleanup Functions ====================
+
+def cleanup_incomplete_data():
+    """
+    Clean up incomplete jobs, matches, and tracked positions when backend shuts down.
+    This prevents orphaned data when developers stop the backend with CTRL+C.
+    """
+    try:
+        logger.info("Starting cleanup of incomplete data...")
+
+        # Get all running or queued jobs
+        running_jobs = supabase.table("jobs").select("id, match_id").in_("status", ["running", "queued"]).execute()
+
+        if running_jobs.data:
+            job_ids = [job["id"] for job in running_jobs.data]
+            match_ids = list(set([job["match_id"] for job in running_jobs.data]))
+
+            logger.info(f"Found {len(job_ids)} incomplete jobs for {len(match_ids)} matches")
+
+            # Delete tracked positions for these matches
+            for match_id in match_ids:
+                try:
+                    tracked_result = supabase.table("tracked_positions").delete().eq("match_id", match_id).execute()
+                    logger.info(f"Deleted tracked positions for match {match_id}")
+                except Exception as e:
+                    logger.error(f"Failed to delete tracked positions for match {match_id}: {e}")
+
+            # Delete analyses for these matches
+            for match_id in match_ids:
+                try:
+                    analyses_result = supabase.table("analyses").delete().eq("match_id", match_id).execute()
+                    logger.info(f"Deleted analyses for match {match_id}")
+                except Exception as e:
+                    logger.error(f"Failed to delete analyses for match {match_id}: {e}")
+
+            # Get team_id for each match before deleting matches
+            match_team_map = {}
+            for match_id in match_ids:
+                try:
+                    match_data = supabase.table("matches").select("team_id").eq("id", match_id).execute()
+                    if match_data.data:
+                        match_team_map[match_id] = match_data.data[0]["team_id"]
+                except Exception as e:
+                    logger.error(f"Failed to get team_id for match {match_id}: {e}")
+
+            # Delete jobs
+            try:
+                jobs_result = supabase.table("jobs").delete().in_("id", job_ids).execute()
+                logger.info(f"Deleted {len(job_ids)} incomplete jobs")
+            except Exception as e:
+                logger.error(f"Failed to delete jobs: {e}")
+
+            # Delete matches
+            for match_id in match_ids:
+                try:
+                    match_result = supabase.table("matches").delete().eq("id", match_id).execute()
+                    logger.info(f"Deleted match {match_id}")
+                except Exception as e:
+                    logger.error(f"Failed to delete match {match_id}: {e}")
+
+            # Clean up local video files
+            for match_id in match_ids:
+                try:
+                    if match_id in match_team_map:
+                        team_id = match_team_map[match_id]
+                        video_dir = Path(f"video_storage/{team_id}/{match_id}")
+                        if video_dir.exists():
+                            shutil.rmtree(video_dir)
+                            logger.info(f"Deleted local video files for match {match_id}")
+                except Exception as e:
+                    logger.error(f"Failed to delete local files for match {match_id}: {e}")
+
+        logger.info("Cleanup completed successfully")
+
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+
+
+def signal_handler(signum, frame):
+    """
+    Handle CTRL+C and other termination signals gracefully.
+    """
+    logger.info(f"Received signal {signum}. Starting graceful shutdown...")
+    cleanup_incomplete_data()
+    logger.info("Graceful shutdown completed. Exiting...")
+    sys.exit(0)
+
+
+# Register signal handlers for graceful shutdown
+signal.signal(signal.SIGINT, signal_handler)   # CTRL+C
+signal.signal(signal.SIGTERM, signal_handler)  # Termination signal
+atexit.register(cleanup_incomplete_data)       # Fallback cleanup
 
 
 if __name__ == "__main__":

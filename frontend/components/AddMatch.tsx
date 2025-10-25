@@ -16,12 +16,13 @@
  */
 
 import { AlertCircle, ArrowLeft, Calendar as CalendarIcon, Check, CheckCircle2, Clock, Loader2, Upload as UploadIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useChunkedUpload } from '../hooks/useChunkedUpload';
 import { useJobPolling } from '../hooks/useJobPolling';
 import { matchesApi } from '../lib/api';
+import DualAnalysisProgress from './DualAnalysisProgress';
 import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
 import { Input } from './ui/input';
@@ -109,15 +110,15 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
     }
   };
 
-  // Step 3: Monitor job progress - automatically handled by useJobPolling hook
-  // When job completes, move to step 4
-  useEffect(() => {
-    if (job && job.status === 'completed' && currentStep === 3) {
+  // Step 3: Monitor job progress - handled by DualAnalysisProgress component
+  // When full analysis completes, move to step 4
+  const handleFullAnalysisComplete = () => {
+    if (currentStep === 3) {
       setTimeout(() => {
         setCurrentStep(4);
       }, 1000);
     }
-  }, [job, currentStep]);
+  };
 
   const getStatusBadge = (status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled', progress?: number) => {
     switch (status) {
@@ -404,77 +405,24 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
               Analysis in Progress
             </h2>
             <p className="mb-8" style={{ color: '#6b7280' }}>
-              Our AI is performing enhanced video analysis with tactical insights, player tracking, and comprehensive metrics.
+              Our AI is performing enhanced video analysis. You'll get quick insights from the first 5 minutes in 1-2 minutes, while the full analysis continues in the background.
             </p>
 
-            {job && (
-              <>
-                {/* Overall Progress */}
-                <div className="mb-8">
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="relative w-32 h-32">
-                      <svg className="w-32 h-32 transform -rotate-90">
-                        <circle
-                          cx="64"
-                          cy="64"
-                          r="56"
-                          stroke="#e5e7eb"
-                          strokeWidth="8"
-                          fill="none"
-                        />
-                        <circle
-                          cx="64"
-                          cy="64"
-                          r="56"
-                          stroke={successColor}
-                          strokeWidth="8"
-                          fill="none"
-                          strokeDasharray={`${2 * Math.PI * 56}`}
-                          strokeDashoffset={`${2 * Math.PI * 56 * (1 - job.progress / 100)}`}
-                          className="transition-all duration-300"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span style={{ fontSize: '1.5rem', fontWeight: 900, color: theme.secondary }}>
-                          {job.progress}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            {matchId && (
+              <DualAnalysisProgress
+                matchId={matchId}
+                onPreviewComplete={() => {
+                  console.log('Preview analysis completed!');
+                }}
+                onFullComplete={handleFullAnalysisComplete}
+              />
+            )}
 
-                {/* Analysis Card */}
-                <div className="space-y-4">
-                  <div
-                    className="border-4 p-6"
-                    style={{ borderColor: job.status === 'completed' ? successColor : theme.accent }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <span style={{ fontWeight: 800, fontSize: '1.125rem' }}>Enhanced Analysis</span>
-                      {getStatusBadge(job.status, job.progress)}
-                    </div>
-                    {job.status === 'running' && (
-                      <Progress value={job.progress} className="h-3">
-                        <div
-                          className="h-full transition-all"
-                          style={{
-                            width: `${job.progress}%`,
-                            backgroundColor: successColor,
-                          }}
-                        />
-                      </Progress>
-                    )}
-                    {job.error_message && (
-                      <div className="mt-3 text-sm text-red-600">
-                        Error: {job.error_message}
-                      </div>
-                    )}
-                    <div className="mt-3 text-sm text-gray-600">
-                      AI-powered tactical analysis with player tracking, heatmaps, and key moments detection.
-                    </div>
-                  </div>
-                </div>
-              </>
+            {!matchId && (
+              <div className="p-8 text-center text-gray-500">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+                <p>Initializing analysis...</p>
+              </div>
             )}
           </div>
         )}

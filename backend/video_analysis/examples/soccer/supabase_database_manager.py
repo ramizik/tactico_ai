@@ -174,38 +174,73 @@ class SupabaseDatabaseManager:
 
     def insert_tracked_positions_batch(self, positions: List[Dict]):
         """
-        Batch insert tracked positions
+        Batch insert tracked positions in the correct format for tracked_positions table
 
         Args:
             positions: List of position dicts with:
-                - frame_id: int
-                - timestamp: float (seconds)
-                - jersey_number: int
+                - frame_id or frame_number: int
+                - timestamp or timestamp_seconds: float (seconds)
+                - jersey_number: int or 'BALL'
                 - team_id: str (UUID)
                 - x: float (homography transformed)
                 - y: float (homography transformed)
                 - confidence: float
                 - tracker_id: int
+                - analysis_scope: str ('preview' or 'full')
         """
-        if not positions:
+        if not positions or not self.current_match_id:
             return
 
-        if self.current_match_id is None:
-            raise ValueError("No match setup. Call setup_match() first.")
+        # Group positions by frame to match table structure
+        frames = {}
 
-        # Add match_id to all positions
         for pos in positions:
-            pos['match_id'] = self.current_match_id
-            # Convert jersey_number to string if it's not 'BALL'
-            if 'jersey_number' in pos and isinstance(pos['jersey_number'], int):
-                pos['jersey_number'] = str(pos['jersey_number'])
+            # Handle field name variations
+            frame_num = pos.get('frame_number') or pos.get('frame_id')
+            timestamp = pos.get('timestamp_seconds') or pos.get('timestamp')
+
+            if frame_num not in frames:
+                frames[frame_num] = {
+                    'match_id': self.current_match_id,
+                    'frame_number': frame_num,
+                    'timestamp_seconds': timestamp,
+                    'tracked_objects': [],
+                    'ball_position': None,
+                    'analysis_scope': pos.get('analysis_scope', 'full')
+                }
+
+            # Add to tracked_objects array or ball_position
+            if pos.get('jersey_number') == 'BALL':
+                # Ball position as separate JSONB field
+                frames[frame_num]['ball_position'] = {
+                    'x': float(pos['x']),
+                    'y': float(pos['y']),
+                    'confidence': float(pos.get('confidence', 1.0))
+                }
+            else:
+                # Player as object in tracked_objects array
+                obj = {
+                    'tracker_id': int(pos['tracker_id']),
+                    'jersey_number': str(pos['jersey_number']),
+                    'x': float(pos['x']),
+                    'y': float(pos['y']),
+                    'confidence': float(pos.get('confidence', 1.0))
+                }
+                if pos.get('team_id'):
+                    obj['team_id'] = str(pos['team_id'])
+
+                frames[frame_num]['tracked_objects'].append(obj)
+
+        # Convert to list for insertion
+        records = list(frames.values())
 
         try:
-            # Supabase batch insert
-            self.supabase.table("tracked_positions").insert(positions).execute()
-            print(f"✓ Inserted {len(positions)} position records to Supabase")
+            # Batch insert to Supabase
+            self.supabase.table("tracked_positions").insert(records).execute()
+            print(f"✓ Inserted {len(records)} frame records ({len(positions)} total positions) to Supabase")
         except Exception as e:
             print(f"✗ Error inserting positions to Supabase: {e}")
+            print(f"  Sample record: {records[0] if records else 'N/A'}")
 
     def insert_event(self, event_type: str, team_id: str, timestamp: str,
                     jersey_number: int, details: dict = None):

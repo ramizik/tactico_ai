@@ -13,17 +13,20 @@ from typing import List, Dict, Optional
 class LocalDataExporter:
     """Export tracking data to local files for analysis"""
 
-    def __init__(self, output_dir: str = "tracking_data"):
+    def __init__(self, output_dir: str = "tracking_data", output_prefix: str = ""):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
 
         # Generate timestamp for this run
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+        # Output prefix for file names (e.g., "preview_")
+        self.output_prefix = output_prefix
+
         # File paths
-        self.positions_csv = self.output_dir / f"positions_{self.timestamp}.csv"
-        self.summary_json = self.output_dir / f"summary_{self.timestamp}.json"
-        self.stats_txt = self.output_dir / f"stats_{self.timestamp}.txt"
+        self.positions_csv = self.output_dir / f"{output_prefix}positions_{self.timestamp}.csv"
+        self.summary_json = self.output_dir / f"{output_prefix}summary_{self.timestamp}.json"
+        self.stats_txt = self.output_dir / f"{output_prefix}stats_{self.timestamp}.txt"
 
         # Data buffers
         self.position_buffer = []
