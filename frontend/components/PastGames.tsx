@@ -1,53 +1,56 @@
 import { Maximize2, Minimize2, Plus, Video, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import goalkeeperImage from '../assets/e182018dfac45d64e40e055e6351b8c34ba96aeb.png';
+import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { matchesApi } from '../lib/api';
+import type { Match } from '../types/api';
 import { AddMatch } from './AddMatch';
 import { AIChat } from './AIChat';
 import { SportSwitcher } from './SportSwitcher';
 
-const pastGames = [
-  {
-    id: 1,
-    date: 'Oct 15, 2025',
-    teams: 'Home Team vs Away Team',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-  },
-  {
-    id: 2,
-    date: 'Oct 12, 2025',
-    teams: 'Tigers vs Lions',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-  },
-  {
-    id: 3,
-    date: 'Oct 8, 2025',
-    teams: 'Eagles vs Hawks',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-  },
-  {
-    id: 4,
-    date: 'Oct 5, 2025',
-    teams: 'Warriors vs Knights',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-  },
-  {
-    id: 5,
-    date: 'Oct 1, 2025',
-    teams: 'Spartans vs Trojans',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-  },
-];
-
 export const PastGames = () => {
   const { theme } = useTheme();
+  const { teamId } = useSession();
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showAddMatch, setShowAddMatch] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<typeof pastGames[0] | null>(null);
+  const [selectedGame, setSelectedGame] = useState<Match | null>(null);
   const [showAIChat, setShowAIChat] = useState(false);
   const [videoPosition, setVideoPosition] = useState({ x: 100, y: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+
+  // Load matches from backend
+  useEffect(() => {
+    const loadMatches = async () => {
+      if (!teamId) return;
+
+      try {
+        setIsLoading(true);
+        const teamMatches = await matchesApi.getTeamMatches(teamId, 20);
+        setMatches(teamMatches);
+      } catch (error) {
+        console.error('Failed to load matches:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadMatches();
+  }, [teamId]);
+
+  // Refresh matches when returning from AddMatch
+  const handleAddMatchComplete = () => {
+    setShowAddMatch(false);
+    // Reload matches
+    if (teamId) {
+      matchesApi.getTeamMatches(teamId, 20)
+        .then(setMatches)
+        .catch(console.error);
+    }
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).tagName === 'VIDEO') return;
@@ -93,7 +96,7 @@ export const PastGames = () => {
     return (
       <AddMatch
         onBack={() => setShowAddMatch(false)}
-        onComplete={() => setShowAddMatch(false)}
+        onComplete={handleAddMatchComplete}
         backButtonText="Back to Past Games"
       />
     );
@@ -134,67 +137,114 @@ export const PastGames = () => {
               </h2>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-4" style={{ borderColor: theme.accent }}>
-                    <th
-                      className="p-4 text-left"
-                      style={{
-                        fontWeight: 800,
-                        backgroundColor: '#f9f9f9',
-                      }}
-                    >
-                      Date
-                    </th>
-                    <th
-                      className="p-4 text-left"
-                      style={{
-                        fontWeight: 800,
-                        backgroundColor: '#f9f9f9',
-                      }}
-                    >
-                      Teams
-                    </th>
-                    <th
-                      className="p-4 text-left"
-                      style={{
-                        fontWeight: 800,
-                        backgroundColor: '#f9f9f9',
-                      }}
-                    >
-                      Video
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pastGames.map((game) => (
-                    <tr
-                      key={game.id}
-                      className="border-b-2 hover:bg-gray-50 transition-colors"
-                      style={{ borderColor: '#e5e5e5' }}
-                    >
-                      <td className="p-4" style={{ fontWeight: 600 }}>
-                        {game.date}
-                      </td>
-                      <td className="p-4" style={{ fontWeight: 800 }}>
-                        {game.teams}
-                      </td>
-                      <td className="p-4">
-                        <button
-                          onClick={() => setSelectedGame(game)}
-                          className="flex items-center gap-2 px-4 py-2 text-white transition-all hover:scale-105"
-                          style={{ backgroundColor: theme.accent, fontWeight: 800 }}
-                        >
-                          <Video className="w-4 h-4" />
-                          Watch
-                        </button>
-                      </td>
+            {isLoading ? (
+              <div className="p-12 text-center text-gray-500">
+                Loading matches...
+              </div>
+            ) : matches.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                <p className="mb-4 text-lg font-bold">No matches yet</p>
+                <p>Add your first match to get started</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b-4" style={{ borderColor: theme.accent }}>
+                      <th
+                        className="p-4 text-left"
+                        style={{
+                          fontWeight: 800,
+                          backgroundColor: '#f9f9f9',
+                        }}
+                      >
+                        Date
+                      </th>
+                      <th
+                        className="p-4 text-left"
+                        style={{
+                          fontWeight: 800,
+                          backgroundColor: '#f9f9f9',
+                        }}
+                      >
+                        Opponent
+                      </th>
+                      <th
+                        className="p-4 text-left"
+                        style={{
+                          fontWeight: 800,
+                          backgroundColor: '#f9f9f9',
+                        }}
+                      >
+                        Status
+                      </th>
+                      <th
+                        className="p-4 text-left"
+                        style={{
+                          fontWeight: 800,
+                          backgroundColor: '#f9f9f9',
+                        }}
+                      >
+                        Action
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {matches.map((match) => (
+                      <tr
+                        key={match.id}
+                        className="border-b-2 hover:bg-gray-50 transition-colors"
+                        style={{ borderColor: '#e5e5e5' }}
+                      >
+                        <td className="p-4" style={{ fontWeight: 600 }}>
+                          {new Date(match.match_date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </td>
+                        <td className="p-4" style={{ fontWeight: 800 }}>
+                          vs {match.opponent}
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className="px-3 py-1 text-xs font-bold rounded"
+                            style={{
+                              backgroundColor:
+                                match.status === 'analyzed' ? '#22c55e' :
+                                  match.status === 'processing' ? '#f59e0b' :
+                                    match.status === 'uploading' ? '#3b82f6' :
+                                      match.status === 'failed' ? '#ef4444' : '#6b7280',
+                              color: 'white'
+                            }}
+                          >
+                            {match.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          {match.status === 'analyzed' && match.analyses?.[0]?.enhanced_video_path ? (
+                            <button
+                              onClick={() => setSelectedGame(match)}
+                              className="flex items-center gap-2 px-4 py-2 text-white transition-all hover:scale-105"
+                              style={{ backgroundColor: theme.accent, fontWeight: 800 }}
+                            >
+                              <Video className="w-4 h-4" />
+                              Watch
+                            </button>
+                          ) : (
+                            <span className="text-gray-400 text-sm">
+                              {match.status === 'processing' ? 'Processing...' :
+                                match.status === 'uploading' ? 'Uploading...' :
+                                  match.status === 'failed' ? 'Failed' : 'Pending'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Goalkeeper Visual - Always Visible */}
@@ -233,7 +283,7 @@ export const PastGames = () => {
           onClose={() => {
             setShowAIChat(false);
           }}
-          matchInfo={selectedGame.teams}
+          matchInfo={`vs ${selectedGame.opponent}`}
         />
       )}
 
@@ -260,7 +310,7 @@ export const PastGames = () => {
             }}
           >
             <h3 className="text-white truncate" style={{ fontWeight: 800, fontSize: '1rem' }}>
-              {selectedGame.teams}
+              vs {selectedGame.opponent}
             </h3>
             <div className="flex items-center gap-2">
               <button
@@ -290,16 +340,23 @@ export const PastGames = () => {
           {/* Video Content */}
           {!isMinimized && (
             <div className="p-4">
-              <video
-                controls
-                autoPlay
-                className="w-full border-2"
-                style={{ borderColor: theme.accent }}
-                src={selectedGame.videoUrl}
-                onClick={(e) => e.stopPropagation()}
-              >
-                Your browser does not support the video tag.
-              </video>
+              {selectedGame.analyses?.[0]?.enhanced_video_path ? (
+                <video
+                  controls
+                  autoPlay
+                  className="w-full border-2"
+                  style={{ borderColor: theme.accent }}
+                  src={`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:8000'}/video/${selectedGame.analyses[0].enhanced_video_path}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  <p className="mb-2 font-bold">Video not available</p>
+                  <p className="text-sm">Analysis not completed or video path missing</p>
+                </div>
+              )}
             </div>
           )}
         </div>

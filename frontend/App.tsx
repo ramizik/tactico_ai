@@ -1,15 +1,16 @@
+import { MessageCircle } from 'lucide-react';
 import { useState } from 'react';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { IntroPage } from './components/IntroPage';
-import { SelectionPage } from './components/SelectionPage';
-import { Dashboard } from './components/Dashboard';
-import { PastGames } from './components/PastGames';
-import { MyTeam } from './components/MyTeam';
 import { AddMatch } from './components/AddMatch';
 import { AIChat } from './components/AIChat';
+import { Dashboard } from './components/Dashboard';
+import { IntroPage } from './components/IntroPage';
+import { MyTeam } from './components/MyTeam';
 import { Navigation } from './components/Navigation';
+import { PastGames } from './components/PastGames';
+import { SelectionPage } from './components/SelectionPage';
 import { ThemedBackground } from './components/ThemedBackground';
-import { MessageCircle } from 'lucide-react';
+import { SessionProvider } from './contexts/SessionContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
 type AppState = 'intro' | 'selection' | 'app';
 type Page = 'dashboard' | 'past-games' | 'my-team' | 'add-match';
@@ -20,7 +21,7 @@ type Page = 'dashboard' | 'past-games' | 'my-team' | 'add-match';
  */
 function AIChatButton({ onClick }: { onClick: () => void }) {
   const { theme } = useTheme();
-  
+
   return (
     <button
       onClick={onClick}
@@ -56,7 +57,7 @@ function AppContent() {
         {currentPage !== 'add-match' && (
           <Navigation currentPage={currentPage} onNavigate={setCurrentPage} />
         )}
-        
+
         <div style={{ paddingTop: currentPage === 'add-match' ? '60px' : '110px' }}>
           {currentPage === 'dashboard' && (
             <Dashboard
@@ -85,8 +86,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <SessionProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </SessionProvider>
   );
 }

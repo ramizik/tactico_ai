@@ -1,42 +1,39 @@
 import { TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import coachImage from '../assets/7bfaab3066f6ffb1c8b4b53ce7e35a1b4a681d8a.png';
+import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { matchesApi } from '../lib/api';
+import type { Match } from '../types/api';
 
 interface DashboardProps {
   onMatchClick: () => void;
 }
 
-const recentMatches = [
-  {
-    id: 1,
-    date: 'Oct 15, 2025',
-    team1: 'Home Team',
-    team2: 'Away Team',
-    score: '3-2',
-    thumbnail: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400',
-  },
-  {
-    id: 2,
-    date: 'Oct 12, 2025',
-    team1: 'Tigers',
-    team2: 'Lions',
-    score: '1-1',
-    thumbnail: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400',
-  },
-  {
-    id: 3,
-    date: 'Oct 8, 2025',
-    team1: 'Eagles',
-    team2: 'Hawks',
-    score: '4-0',
-    thumbnail: 'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=400',
-  },
-];
-
-
-
 export const Dashboard = ({ onMatchClick }: DashboardProps) => {
   const { theme } = useTheme();
+  const { teamId } = useSession();
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load recent matches from backend
+  useEffect(() => {
+    const loadMatches = async () => {
+      if (!teamId) return;
+
+      try {
+        setIsLoading(true);
+        const recentMatches = await matchesApi.getTeamMatches(teamId, 5);
+        setMatches(recentMatches);
+      } catch (error) {
+        console.error('Failed to load matches:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadMatches();
+  }, [teamId]);
 
   return (
     <div className="min-h-screen px-6 md:px-12 pb-8" style={{ paddingTop: '60px' }}>
@@ -67,41 +64,60 @@ export const Dashboard = ({ onMatchClick }: DashboardProps) => {
           >
             Recent Matches
           </h2>
-          <div className="space-y-4">
-            {recentMatches.map((match) => (
-              <button
-                key={match.id}
-                onClick={onMatchClick}
-                className="w-full bg-white border-4 p-4 flex gap-4 items-center transition-all hover:scale-[1.02] hover:shadow-xl"
-                style={{ borderColor: theme.accent }}
-              >
-                <div
-                  className="w-32 h-20 bg-gray-200 flex-shrink-0"
-                  style={{
-                    backgroundImage: `url(${match.thumbnail})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                />
-                <div className="flex-1 text-left">
-                  <div className="text-gray-600 text-sm mb-1">{match.date}</div>
-                  <div style={{ fontWeight: 800, fontSize: '1.125rem' }}>
-                    {match.team1} vs {match.team2}
-                  </div>
-                </div>
-                <div
-                  className="text-white px-6 py-3"
-                  style={{
-                    fontWeight: 900,
-                    fontSize: '1.5rem',
-                    backgroundColor: theme.primary,
-                  }}
+          {isLoading ? (
+            <div className="text-center text-white py-12">
+              <div className="text-xl">Loading matches...</div>
+            </div>
+          ) : matches.length === 0 ? (
+            <div className="text-center text-white py-12">
+              <div className="text-xl mb-4">No matches yet</div>
+              <div className="text-gray-300">Add your first match to get started</div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {matches.map((match) => (
+                <button
+                  key={match.id}
+                  onClick={onMatchClick}
+                  className="w-full bg-white border-4 p-4 flex gap-4 items-center transition-all hover:scale-[1.02] hover:shadow-xl"
+                  style={{ borderColor: theme.accent }}
                 >
-                  {match.score}
-                </div>
-              </button>
-            ))}
-          </div>
+                  <div className="w-32 h-20 bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                    <span className="text-gray-500 text-sm font-bold">
+                      {match.status === 'analyzed' ? '✓ Analyzed' :
+                        match.status === 'processing' ? '⏳ Processing' :
+                          match.status === 'uploading' ? '↑ Uploading' :
+                            '○ New'}
+                    </span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="text-gray-600 text-sm mb-1">
+                      {new Date(match.match_date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '1.125rem' }}>
+                      vs {match.opponent}
+                    </div>
+                  </div>
+                  {match.score_home !== undefined && match.score_away !== undefined && (
+                    <div
+                      className="text-white px-6 py-3"
+                      style={{
+                        fontWeight: 900,
+                        fontSize: '1.5rem',
+                        backgroundColor: theme.primary,
+                      }}
+                    >
+                      {match.score_home}-{match.score_away}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Second Row: Performance Widget & Coach Image */}

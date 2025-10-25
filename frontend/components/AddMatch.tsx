@@ -4,20 +4,24 @@
  *
  * Steps:
  * 1. Details - Enter match information (opponent, date) - Sport is always Football
- * 2. Upload - Upload video file with progress tracking
- * 3. Analysis - Monitor AI analysis progress (quick brief + full analysis)
+ * 2. Upload - Upload video file with chunked upload (10MB chunks)
+ * 3. Analysis - Monitor AI enhanced analysis progress
  * 4. Complete - Success screen with actions
  *
- * BACKEND_HOOK:
- * - Step 1: POST /api/matches { teamId, opponent, date, sport: 'Football' }
- * - Step 2: Upload to Supabase Storage, POST video reference
- * - Step 3: Poll GET /api/jobs/:jobId for analysis status
+ * BACKEND INTEGRATION:
+ * - Step 1: POST /api/teams/{teamId}/matches - Create match record
+ * - Step 2: POST /api/upload/video-chunk (chunked upload) - Upload video in 10MB chunks
+ * - Step 3: Poll GET /api/matches/{matchId}/job - Monitor enhanced_analysis job status
  * - Step 4: Redirect to match detail or dashboard
  */
 
 import { AlertCircle, ArrowLeft, Calendar as CalendarIcon, Check, CheckCircle2, Clock, Loader2, Upload as UploadIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useChunkedUpload } from '../hooks/useChunkedUpload';
+import { useJobPolling } from '../hooks/useJobPolling';
+import { matchesApi } from '../lib/api';
 import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
 import { Input } from './ui/input';
@@ -38,136 +42,84 @@ interface MatchDetails {
   date: Date | null;
 }
 
-interface UploadStatus {
-  fileName: string;
-  progress: number;
-  speed: string;
-  eta: string;
-}
-
-interface AnalysisStatus {
-  quickBrief: 'queued' | 'running' | 'completed' | 'failed';
-  quickBriefProgress: number;
-  fullAnalysis: 'queued' | 'running' | 'completed' | 'failed';
-  fullAnalysisProgress: number;
-  overallProgress: number;
-}
-
 export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboard' }: AddMatchProps) => {
   const { theme } = useTheme();
+  const { teamId } = useSession();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [matchDetails, setMatchDetails] = useState<MatchDetails>({
     opponent: '',
     date: null,
   });
-  const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
-  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>({
-    quickBrief: 'queued',
-    quickBriefProgress: 0,
-    fullAnalysis: 'queued',
-    fullAnalysisProgress: 0,
-    overallProgress: 0,
-  });
+  const [matchId, setMatchId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Chunked upload hook
+  const { progress: uploadProgress, uploadVideo, reset: resetUpload } = useChunkedUpload();
+
+  // Job polling hook (only enabled in step 3)
+  const { job } = useJobPolling(matchId, currentStep === 3);
 
   // Success/Progress color (bright green)
   const successColor = '#22c55e';
 
-  // Step 2: Simulate upload progress
-  useEffect(() => {
-    if (uploadStatus && uploadStatus.progress < 100) {
-      const timer = setTimeout(() => {
-        const newProgress = Math.min(uploadStatus.progress + 10, 100);
-        const eta = Math.max(0, Math.floor((100 - newProgress) / 10));
-        setUploadStatus({
-          ...uploadStatus,
-          progress: newProgress,
-          eta: `0:${eta.toString().padStart(2, '0')}`,
-        });
-
-        // When upload completes, move to analysis
-        if (newProgress === 100) {
-          setTimeout(() => {
-            setCurrentStep(3);
-          }, 500);
-        }
-      }, 300);
-      return () => clearTimeout(timer);
+  // Step 1: Create match in backend
+  const handleCreateMatch = async () => {
+    if (!teamId) {
+      setError('No team selected. Please go back and select a university.');
+      return;
     }
-  }, [uploadStatus]);
 
-  // Step 3: Simulate analysis progress
-  useEffect(() => {
-    if (currentStep === 3) {
-      // Start quick brief analysis
-      const quickBriefTimer = setTimeout(() => {
-        setAnalysisStatus((prev) => ({ ...prev, quickBrief: 'running' }));
-      }, 1000);
-
-      // Simulate quick brief progress
-      const progressTimer = setInterval(() => {
-        setAnalysisStatus((prev) => {
-          if (prev.quickBrief === 'running' && prev.quickBriefProgress < 100) {
-            const newProgress = Math.min(prev.quickBriefProgress + 5, 100);
-            return {
-              ...prev,
-              quickBriefProgress: newProgress,
-              overallProgress: Math.floor(newProgress / 2),
-            };
-          }
-          if (prev.quickBriefProgress === 100 && prev.quickBrief === 'running') {
-            return {
-              ...prev,
-              quickBrief: 'completed',
-              fullAnalysis: 'running',
-            };
-          }
-          if (prev.fullAnalysis === 'running' && prev.fullAnalysisProgress < 100) {
-            const newProgress = Math.min(prev.fullAnalysisProgress + 3, 100);
-            return {
-              ...prev,
-              fullAnalysisProgress: newProgress,
-              overallProgress: Math.floor(50 + newProgress / 2),
-            };
-          }
-          if (prev.fullAnalysisProgress === 100 && prev.fullAnalysis === 'running') {
-            setTimeout(() => setCurrentStep(4), 1000);
-            return {
-              ...prev,
-              fullAnalysis: 'completed',
-              overallProgress: 100,
-            };
-          }
-          return prev;
-        });
-      }, 300);
-
-      return () => {
-        clearTimeout(quickBriefTimer);
-        clearInterval(progressTimer);
-      };
+    if (!matchDetails.opponent || !matchDetails.date) {
+      setError('Please fill in all match details.');
+      return;
     }
-  }, [currentStep]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // BACKEND_HOOK: Upload to Supabase Storage
-      setUploadStatus({
-        fileName: file.name,
-        progress: 0,
-        speed: '50 MB/s',
-        eta: '0:10',
+    try {
+      setError(null);
+      const matchResult = await matchesApi.create(teamId, {
+        opponent: matchDetails.opponent,
+        sport: 'soccer',
+        match_date: matchDetails.date.toISOString()
       });
+
+      setMatchId(matchResult.match_id);
+      setCurrentStep(2);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create match');
     }
   };
 
-  const handleCreateMatch = () => {
-    // BACKEND_HOOK: POST /api/matches { teamId, opponent, date, sport: 'Football' }
-    setCurrentStep(2);
+  // Step 2: Handle file selection and upload
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+
+    if (matchId && teamId) {
+      const success = await uploadVideo(file, matchId, teamId);
+      if (success) {
+        // Upload complete, move to analysis step
+        setTimeout(() => {
+          setCurrentStep(3);
+        }, 500);
+      }
+    }
   };
 
-  const getStatusBadge = (status: 'queued' | 'running' | 'completed' | 'failed', progress?: number) => {
+  // Step 3: Monitor job progress - automatically handled by useJobPolling hook
+  // When job completes, move to step 4
+  useEffect(() => {
+    if (job && job.status === 'completed' && currentStep === 3) {
+      setTimeout(() => {
+        setCurrentStep(4);
+      }, 1000);
+    }
+  }, [job, currentStep]);
+
+  const getStatusBadge = (status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled', progress?: number) => {
     switch (status) {
       case 'completed':
         return (
@@ -277,6 +229,15 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
             </h2>
             <p className="mb-8" style={{ color: '#6b7280' }}>Enter the match details to get started.</p>
 
+            {error && (
+              <div className="mb-6 p-4 border-l-4 bg-red-50 border-red-500">
+                <div className="flex items-center gap-2 text-red-600" style={{ fontWeight: 700 }}>
+                  <AlertCircle className="w-5 h-5" />
+                  {error}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-6">
               {/* Opponent Team */}
               <div>
@@ -359,11 +320,10 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
               Upload Video
             </h2>
             <p className="mb-8" style={{ color: '#6b7280' }}>
-              Upload your match video for analysis. The system will automatically analyze the first 3 minutes for a
-              quick brief, then process the full video.
+              Upload your match video for AI analysis. Video will be uploaded in 10MB chunks.
             </p>
 
-            {!uploadStatus ? (
+            {!uploadProgress.isUploading && !uploadProgress.isComplete ? (
               <label className="block">
                 <input
                   type="file"
@@ -380,40 +340,49 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
                   <div style={{ fontWeight: 800, fontSize: '1.25rem', marginBottom: '0.5rem' }}>
                     Select Video File
                   </div>
-                  <div style={{ color: '#6b7280' }}>Max file size: 1 GB</div>
+                  <div style={{ color: '#6b7280' }}>Supported formats: MP4, MOV, AVI</div>
                 </div>
               </label>
             ) : (
               <div className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <span style={{ fontWeight: 700 }}>{uploadStatus.fileName}</span>
+                    <span style={{ fontWeight: 700 }}>{selectedFile?.name || 'Uploading...'}</span>
                     <span style={{ color: '#6b7280' }}>
-                      {uploadStatus.speed} • ETA {uploadStatus.eta}
+                      Chunk {uploadProgress.uploadedChunks} / {uploadProgress.totalChunks}
                     </span>
                   </div>
-                  <Progress value={uploadStatus.progress} className="h-4" style={{ backgroundColor: '#e5e7eb' }}>
+                  <Progress value={uploadProgress.percentage} className="h-4" style={{ backgroundColor: '#e5e7eb' }}>
                     <div
                       className="h-full transition-all"
                       style={{
-                        width: `${uploadStatus.progress}%`,
+                        width: `${uploadProgress.percentage}%`,
                         backgroundColor: successColor,
                       }}
                     />
                   </Progress>
                   <div className="text-right mt-2" style={{ fontWeight: 700, color: successColor }}>
-                    {uploadStatus.progress}%
+                    {uploadProgress.percentage}%
                   </div>
                 </div>
 
-                {uploadStatus.progress > 0 && (
+                {uploadProgress.error && (
+                  <div className="p-4 border-l-4 bg-red-50 border-red-500">
+                    <div className="flex items-center gap-2 text-red-600" style={{ fontWeight: 700 }}>
+                      <AlertCircle className="w-5 h-5" />
+                      Upload failed: {uploadProgress.error}
+                    </div>
+                  </div>
+                )}
+
+                {uploadProgress.isComplete && (
                   <div
                     className="p-4 border-l-4 bg-green-50"
                     style={{ borderColor: successColor }}
                   >
                     <div className="flex items-center gap-2" style={{ color: successColor, fontWeight: 700 }}>
                       <CheckCircle2 className="w-5 h-5" />
-                      Quick Brief Analysis Started
+                      Upload complete! Starting enhanced analysis...
                     </div>
                   </div>
                 )}
@@ -435,89 +404,78 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
               Analysis in Progress
             </h2>
             <p className="mb-8" style={{ color: '#6b7280' }}>
-              Our AI is analyzing your match video. This may take a few minutes.
+              Our AI is performing enhanced video analysis with tactical insights, player tracking, and comprehensive metrics.
             </p>
 
-            {/* Overall Progress */}
-            <div className="mb-8">
-              <div className="flex items-center justify-center mb-6">
-                <div className="relative w-32 h-32">
-                  <svg className="w-32 h-32 transform -rotate-90">
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
-                      stroke="#e5e7eb"
-                      strokeWidth="8"
-                      fill="none"
-                    />
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
-                      stroke={successColor}
-                      strokeWidth="8"
-                      fill="none"
-                      strokeDasharray={`${2 * Math.PI * 56}`}
-                      strokeDashoffset={`${2 * Math.PI * 56 * (1 - analysisStatus.overallProgress / 100)}`}
-                      className="transition-all duration-300"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span style={{ fontSize: '1.5rem', fontWeight: 900, color: theme.secondary }}>
-                      {analysisStatus.overallProgress}%
-                    </span>
+            {job && (
+              <>
+                {/* Overall Progress */}
+                <div className="mb-8">
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="relative w-32 h-32">
+                      <svg className="w-32 h-32 transform -rotate-90">
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="56"
+                          stroke="#e5e7eb"
+                          strokeWidth="8"
+                          fill="none"
+                        />
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="56"
+                          stroke={successColor}
+                          strokeWidth="8"
+                          fill="none"
+                          strokeDasharray={`${2 * Math.PI * 56}`}
+                          strokeDashoffset={`${2 * Math.PI * 56 * (1 - job.progress / 100)}`}
+                          className="transition-all duration-300"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span style={{ fontSize: '1.5rem', fontWeight: 900, color: theme.secondary }}>
+                          {job.progress}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Process Cards */}
-            <div className="space-y-4">
-              {/* Quick Brief Analysis */}
-              <div
-                className="border-4 p-6"
-                style={{ borderColor: analysisStatus.quickBrief === 'completed' ? successColor : theme.accent }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span style={{ fontWeight: 800, fontSize: '1.125rem' }}>Quick Brief Analysis</span>
-                  {getStatusBadge(analysisStatus.quickBrief, analysisStatus.quickBriefProgress)}
+                {/* Analysis Card */}
+                <div className="space-y-4">
+                  <div
+                    className="border-4 p-6"
+                    style={{ borderColor: job.status === 'completed' ? successColor : theme.accent }}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span style={{ fontWeight: 800, fontSize: '1.125rem' }}>Enhanced Analysis</span>
+                      {getStatusBadge(job.status, job.progress)}
+                    </div>
+                    {job.status === 'running' && (
+                      <Progress value={job.progress} className="h-3">
+                        <div
+                          className="h-full transition-all"
+                          style={{
+                            width: `${job.progress}%`,
+                            backgroundColor: successColor,
+                          }}
+                        />
+                      </Progress>
+                    )}
+                    {job.error_message && (
+                      <div className="mt-3 text-sm text-red-600">
+                        Error: {job.error_message}
+                      </div>
+                    )}
+                    <div className="mt-3 text-sm text-gray-600">
+                      AI-powered tactical analysis with player tracking, heatmaps, and key moments detection.
+                    </div>
+                  </div>
                 </div>
-                {analysisStatus.quickBrief === 'running' && (
-                  <Progress value={analysisStatus.quickBriefProgress} className="h-3">
-                    <div
-                      className="h-full transition-all"
-                      style={{
-                        width: `${analysisStatus.quickBriefProgress}%`,
-                        backgroundColor: successColor,
-                      }}
-                    />
-                  </Progress>
-                )}
-              </div>
-
-              {/* Full Analysis */}
-              <div
-                className="border-4 p-6"
-                style={{ borderColor: analysisStatus.fullAnalysis === 'completed' ? successColor : theme.accent }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span style={{ fontWeight: 800, fontSize: '1.125rem' }}>Full Analysis</span>
-                  {getStatusBadge(analysisStatus.fullAnalysis, analysisStatus.fullAnalysisProgress)}
-                </div>
-                {analysisStatus.fullAnalysis === 'running' && (
-                  <Progress value={analysisStatus.fullAnalysisProgress} className="h-3">
-                    <div
-                      className="h-full transition-all"
-                      style={{
-                        width: `${analysisStatus.fullAnalysisProgress}%`,
-                        backgroundColor: successColor,
-                      }}
-                    />
-                  </Progress>
-                )}
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
 
@@ -562,14 +520,10 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
                 onClick={() => {
                   setCurrentStep(1);
                   setMatchDetails({ opponent: '', date: null });
-                  setUploadStatus(null);
-                  setAnalysisStatus({
-                    quickBrief: 'queued',
-                    quickBriefProgress: 0,
-                    fullAnalysis: 'queued',
-                    fullAnalysisProgress: 0,
-                    overallProgress: 0,
-                  });
+                  setMatchId(null);
+                  setSelectedFile(null);
+                  setError(null);
+                  resetUpload();
                 }}
                 variant="outline"
                 className="px-8 py-6 border-4 transition-all hover:scale-105"

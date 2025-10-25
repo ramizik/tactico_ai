@@ -1,6 +1,9 @@
 import { Award, TrendingUp, UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { playersApi } from '../lib/api';
+import type { Player as ApiPlayer } from '../types/api';
 import { SportSwitcher } from './SportSwitcher';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
@@ -8,115 +11,63 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-interface Player {
-  id: number;
-  name: string;
-  position: string;
-  number: number;
-  stats: { goals: number; assists: number; rating: number };
-  avatar: string;
-}
-
-const initialPlayers: Player[] = [
-  {
-    id: 1,
-    name: 'Alex Johnson',
-    position: 'Forward',
-    number: 10,
-    stats: { goals: 12, assists: 8, rating: 8.5 },
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-  },
-  {
-    id: 2,
-    name: 'Maria Garcia',
-    position: 'Midfielder',
-    number: 7,
-    stats: { goals: 5, assists: 15, rating: 8.2 },
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-  },
-  {
-    id: 3,
-    name: 'James Smith',
-    position: 'Defender',
-    number: 4,
-    stats: { goals: 2, assists: 3, rating: 7.8 },
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-  },
-  {
-    id: 4,
-    name: 'Emma Davis',
-    position: 'Goalkeeper',
-    number: 1,
-    stats: { goals: 0, assists: 0, rating: 8.7 },
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-  },
-  {
-    id: 5,
-    name: 'Michael Chen',
-    position: 'Forward',
-    number: 9,
-    stats: { goals: 18, assists: 6, rating: 9.1 },
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-  },
-  {
-    id: 6,
-    name: 'Sarah Wilson',
-    position: 'Midfielder',
-    number: 8,
-    stats: { goals: 7, assists: 11, rating: 8.0 },
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-  },
-];
-
 export const MyTeam = () => {
   const { theme, university } = useTheme();
-  const [players, setPlayers] = useState<Player[]>(initialPlayers);
+  const { teamId } = useSession();
+  const [players, setPlayers] = useState<ApiPlayer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddPlayerOpen, setIsAddPlayerOpen] = useState(false);
   const [newPlayer, setNewPlayer] = useState({
     name: '',
     position: '',
     number: '',
-    goals: '',
-    assists: '',
-    rating: '',
     avatar: '',
   });
 
-  /**
-   * BACKEND_HOOK (Add Player):
-   * - POST /api/teams/{teamId}/players with player data
-   * - Upload avatar to Supabase Storage if file is provided
-   * - Return created player with ID
-   */
-  const handleAddPlayer = () => {
-    if (!newPlayer.name || !newPlayer.position || !newPlayer.number) {
+  // Load players from backend
+  useEffect(() => {
+    const loadPlayers = async () => {
+      if (!teamId) return;
+
+      try {
+        setIsLoading(true);
+        const teamPlayers = await playersApi.getTeamPlayers(teamId);
+        setPlayers(teamPlayers);
+      } catch (error) {
+        console.error('Failed to load players:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPlayers();
+  }, [teamId]);
+
+  const handleAddPlayer = async () => {
+    if (!newPlayer.name || !newPlayer.position || !newPlayer.number || !teamId) {
       return; // Basic validation
     }
 
-    const player: Player = {
-      id: Math.max(...players.map(p => p.id), 0) + 1,
-      name: newPlayer.name,
-      position: newPlayer.position,
-      number: parseInt(newPlayer.number) || 0,
-      stats: {
-        goals: parseInt(newPlayer.goals) || 0,
-        assists: parseInt(newPlayer.assists) || 0,
-        rating: parseFloat(newPlayer.rating) || 0,
-      },
-      avatar: newPlayer.avatar || 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=150',
-    };
+    try {
+      const createdPlayer = await playersApi.create(teamId, {
+        name: newPlayer.name,
+        position: newPlayer.position,
+        number: parseInt(newPlayer.number) || 0,
+        avatar_url: newPlayer.avatar || undefined
+      });
 
-    setPlayers([...players, player]);
-    setIsAddPlayerOpen(false);
-    setNewPlayer({
-      name: '',
-      position: '',
-      number: '',
-      goals: '',
-      assists: '',
-      rating: '',
-      avatar: '',
-    });
+      setPlayers([...players, createdPlayer]);
+      setIsAddPlayerOpen(false);
+      setNewPlayer({
+        name: '',
+        position: '',
+        number: '',
+        avatar: '',
+      });
+    } catch (error) {
+      console.error('Failed to create player:', error);
+      alert('Failed to create player. Please try again.');
+    }
   };
 
   // Note: Remove player functionality is not currently implemented in the UI
@@ -224,67 +175,78 @@ export const MyTeam = () => {
 
         {/* Players Grid - 2 Column Layout */}
         <div className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {players.map((player) => (
-              <div
-                key={player.id}
-                className="bg-white border-4 p-5 flex flex-col"
-                style={{ borderColor: theme.accent }}
-              >
-                <div className="flex items-start gap-3 mb-4">
-                  <div
-                    className="w-16 h-16 rounded-full bg-gray-200 flex-shrink-0"
-                    style={{
-                      backgroundImage: `url(${player.avatar})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }}
-                  />
-                  <div className="flex-1">
-                    <div style={{ fontWeight: 900, fontSize: '1.125rem', lineHeight: '1.3' }}>
-                      {player.name}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
-                      {player.position}
-                    </div>
+          {isLoading ? (
+            <div className="text-center text-white py-12">
+              <div className="text-xl">Loading players...</div>
+            </div>
+          ) : players.length === 0 ? (
+            <div className="text-center text-white py-12">
+              <div className="text-xl mb-4">No players yet</div>
+              <div className="text-gray-300">Add your first player to get started</div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {players.map((player) => (
+                <div
+                  key={player.id}
+                  className="bg-white border-4 p-5 flex flex-col"
+                  style={{ borderColor: theme.accent }}
+                >
+                  <div className="flex items-start gap-3 mb-4">
                     <div
-                      className="inline-block px-3 py-1 mt-2 text-white"
+                      className="w-16 h-16 rounded-full bg-gray-200 flex-shrink-0"
                       style={{
-                        backgroundColor: theme.primary,
-                        fontWeight: 800,
-                        fontSize: '0.875rem',
+                        backgroundImage: `url(${player.avatar_url || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
                       }}
-                    >
-                      #{player.number}
+                    />
+                    <div className="flex-1">
+                      <div style={{ fontWeight: 900, fontSize: '1.125rem', lineHeight: '1.3' }}>
+                        {player.name}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+                        {player.position}
+                      </div>
+                      <div
+                        className="inline-block px-3 py-1 mt-2 text-white"
+                        style={{
+                          backgroundColor: theme.primary,
+                          fontWeight: 800,
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        #{player.jersey_number}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Goals</span>
+                      <span style={{ fontWeight: 800, fontSize: '1rem' }}>{player.stats.goals}</span>
+                    </div>
+                    <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Assists</span>
+                      <span style={{ fontWeight: 800, fontSize: '1rem' }}>{player.stats.assists}</span>
+                    </div>
+                    <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Rating</span>
+                      <span
+                        style={{
+                          fontWeight: 900,
+                          fontSize: '1.125rem',
+                          color: theme.primary,
+                        }}
+                      >
+                        {player.stats.rating}
+                      </span>
                     </div>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
-                    <span style={{ color: '#6b7280', fontWeight: 600 }}>Goals</span>
-                    <span style={{ fontWeight: 800, fontSize: '1rem' }}>{player.stats.goals}</span>
-                  </div>
-                  <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
-                    <span style={{ color: '#6b7280', fontWeight: 600 }}>Assists</span>
-                    <span style={{ fontWeight: 800, fontSize: '1rem' }}>{player.stats.assists}</span>
-                  </div>
-                  <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
-                    <span style={{ color: '#6b7280', fontWeight: 600 }}>Rating</span>
-                    <span
-                      style={{
-                        fontWeight: 900,
-                        fontSize: '1.125rem',
-                        color: theme.primary,
-                      }}
-                    >
-                      {player.stats.rating}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Add Player Dialog */}
@@ -384,55 +346,10 @@ export const MyTeam = () => {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                {/* Goals */}
-                <div>
-                  <Label htmlFor="goals" style={{ fontWeight: 700, fontSize: '0.875rem' }}>
-                    Goals
-                  </Label>
-                  <Input
-                    id="goals"
-                    type="number"
-                    placeholder="0"
-                    value={newPlayer.goals}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, goals: e.target.value })}
-                    className="mt-2 border-2"
-                    style={{ borderColor: theme.accent }}
-                  />
-                </div>
-
-                {/* Assists */}
-                <div>
-                  <Label htmlFor="assists" style={{ fontWeight: 700, fontSize: '0.875rem' }}>
-                    Assists
-                  </Label>
-                  <Input
-                    id="assists"
-                    type="number"
-                    placeholder="0"
-                    value={newPlayer.assists}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, assists: e.target.value })}
-                    className="mt-2 border-2"
-                    style={{ borderColor: theme.accent }}
-                  />
-                </div>
-
-                {/* Rating */}
-                <div>
-                  <Label htmlFor="rating" style={{ fontWeight: 700, fontSize: '0.875rem' }}>
-                    Rating
-                  </Label>
-                  <Input
-                    id="rating"
-                    type="number"
-                    step="0.1"
-                    placeholder="8.0"
-                    value={newPlayer.rating}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, rating: e.target.value })}
-                    className="mt-2 border-2"
-                    style={{ borderColor: theme.accent }}
-                  />
-                </div>
+              <div className="p-4 bg-blue-50 border-l-4 border-blue-500">
+                <p className="text-sm text-blue-800">
+                  Player stats (goals, assists, rating) will be automatically calculated from match analysis.
+                </p>
               </div>
             </div>
 
