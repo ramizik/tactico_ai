@@ -148,8 +148,12 @@ class VideoProcessor:
             success = self.merge_video_chunks(chunk_paths, output_path)
             if success:
                 logger.info(f"Video chunks combined successfully: {output_path}")
-                return output_path
+                # Return absolute path to ensure it works from any directory
+                absolute_path = os.path.abspath(output_path)
+                logger.info(f"Returning absolute path: {absolute_path}")
+                return absolute_path
             else:
+                logger.error("Failed to merge video chunks")
                 return None
 
         except Exception as e:
@@ -328,6 +332,16 @@ class VideoProcessor:
         """
         try:
             logger.info(f"Starting ML analysis for match {match_id}")
+            logger.info(f"Video path provided: {video_path}")
+
+            # Verify video exists before processing
+            if not os.path.exists(video_path):
+                error_msg = f"Video file does not exist at path: {video_path}"
+                logger.error(error_msg)
+                return None, {"error": error_msg}
+
+            video_size = os.path.getsize(video_path)
+            logger.info(f"Video file exists, size: {video_size} bytes")
 
             # Import and use the ml analysis processor
             from ml_analysis_processor import process_video_with_ml_analysis

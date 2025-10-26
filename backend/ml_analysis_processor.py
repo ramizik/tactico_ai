@@ -81,9 +81,22 @@ class MLAnalysisProcessor:
             logger.info(f"Starting new analysis for match {match_id}")
             logger.info(f"Input video: {video_path}")
 
+            # Validate video file exists
+            if not os.path.exists(video_path):
+                error_msg = f"Video file not found: {video_path}"
+                logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
+
             # Step 1: Read video
             logger.info("📹 Reading video file...")
             video_frames = read_video(video_path)
+
+            # Check if video was read successfully
+            if video_frames is None or len(video_frames) == 0:
+                error_msg = f"Failed to read video or video is empty: {video_path}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
             logger.info(f"✅ Loaded {len(video_frames)} frames")
 
             # Step 2: Initialize tracker
@@ -171,10 +184,10 @@ class MLAnalysisProcessor:
             speed_and_distance_estimator.draw_speed_and_distance(output_video_frames, tracks)
             logger.info("✅ Video rendering complete")
 
-        # Step 12: Save output video
-        output_dir = os.path.join('video_outputs')
-        os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, f'processed_{match_id}.avi')
+            # Step 12: Save output video
+            output_dir = os.path.join('video_outputs')
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, f'processed_{match_id}.avi')
 
             logger.info("💾 Saving output video...")
             save_video(output_video_frames, output_path)
