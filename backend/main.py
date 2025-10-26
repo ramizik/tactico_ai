@@ -63,6 +63,30 @@ except Exception as e:
     print(f"Letta client initialization failed: {e}")
     letta_client = None
 
+# Import Reka client
+try:
+    from core.reka_client import get_reka
+    reka_client = get_reka()
+    print("Reka AI client loaded successfully")
+except ImportError as e:
+    print(f"Reka client import failed: {e}")
+    reka_client = None
+except Exception as e:
+    print(f"Reka client initialization failed: {e}")
+    reka_client = None
+
+# Import Fish TTS client
+try:
+    from core.fish_tts_client import get_fish_tts
+    fish_tts_client = get_fish_tts()
+    print("Fish TTS client loaded successfully")
+except ImportError as e:
+    print(f"Fish TTS client import failed: {e}")
+    fish_tts_client = None
+except Exception as e:
+    print(f"Fish TTS client initialization failed: {e}")
+    fish_tts_client = None
+
 import logging
 from datetime import datetime, timedelta
 
@@ -163,11 +187,17 @@ async def health_check():
     if _job_processor:
         job_processor_status = "running" if _job_processor.running else "stopped"
 
+    # Add Reka status
+    reka_status = "not_available"
+    if reka_client:
+        reka_status = "available" if reka_client.is_available() else "not_configured"
+
     return {
         "status": "healthy",
         "service": "TacticoAI API",
         "version": "1.0.0",
-        "job_processor": job_processor_status
+        "job_processor": job_processor_status,
+        "reka_ai": reka_status
     }
 
 
@@ -896,6 +926,120 @@ async def test_letta():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Letta AI test failed: {str(e)}")
+
+
+# ==================== Reka AI Endpoints ====================
+
+@app.get("/api/reka/status")
+async def get_reka_status():
+    """Get Reka AI client status"""
+    if not reka_client:
+        return {
+            "available": False,
+            "message": "Reka client not initialized"
+        }
+
+    status = reka_client.get_status()
+    return {
+        "available": status["available"],
+        "api_key_set": status["api_key_set"],
+        "model_core": status["model_core"],
+        "model_flash": status["model_flash"],
+        "message": "Reka AI is ready" if status["available"] else "Reka AI not configured"
+    }
+
+@app.post("/api/reka/analyze")
+async def analyze_video_with_reka(
+    video: UploadFile = File(...),
+    prompt: str = Form(...),
+    model: str = Form("reka-flash")
+):
+    """Analyze video using Reka AI with Fish Audio TTS"""
+    
+    if not reka_client or not reka_client.is_available():
+        raise HTTPException(status_code=503, detail="Reka AI not available")
+
+    video_content = await video.read()
+    if len(video_content) > 100 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Video file too large (max 100MB)")
+
+    try:
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_file:
+            temp_file.write(video_content)
+            temp_video_path = temp_file.name
+
+        try:
+            # Get Reka AI analysis
+            analysis_result = await reka_client.analyze_video(temp_video_path, prompt, model)
+            
+            if analysis_result is None:
+                raise HTTPException(status_code=500, detail="Reka AI analysis failed")
+
+            # ========== FISH AI TTS INTEGRATION ==========
+            audio_data = None
+            audio_error = None
+            
+            if fish_tts_client and fish_tts_client.is_available():
+                try:
+                    # Extract text from Reka response
+                    text_for_tts = fish_tts_client.extract_text_from_reka_response(analysis_result)
+                    
+                    if text_for_tts:
+                        logger.info("Generating audio from Reka analysis...")
+                        audio_data = await fish_tts_client.stream_text_to_audio(text_for_tts)
+                        
+                        if audio_data:
+                            logger.info(f"Audio generated successfully: {len(audio_data)} bytes")
+                        else:
+                            logger.warning("Fish AI TTS returned no audio data")
+                    else:
+                        logger.warning("No text extracted from Reka response for TTS")
+                        
+                except Exception as e:
+                    audio_error = str(e)
+                    logger.error(f"Fish AI TTS failed: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # Don't fail the entire request if TTS fails
+            else:
+                logger.info("Fish TTS not available, skipping audio generation")
+
+            # Build response with audio
+            response = {
+                "success": True,
+                "result": analysis_result,
+                "model": model,
+                "prompt": prompt,
+                "filename": video.filename,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Add audio info to response
+            if audio_data:
+                import base64
+                response["audio"] = {
+                    "available": True,
+                    "data_length": len(audio_data),
+                    "sample_rate": 44100,
+                    "format": "mp3",
+                    "data_base64": base64.b64encode(audio_data).decode('utf-8')
+                }
+            else:
+                response["audio"] = {
+                    "available": False,
+                    "error": audio_error if audio_error else "Audio generation skipped or failed"
+                }
+            
+            return response
+
+        finally:
+            os.unlink(temp_video_path)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reka AI analysis error: {str(e)}")
 
 
 # ==================== Cleanup Functions ====================

@@ -38,19 +38,21 @@ export const Dashboard = ({ onMatchClick }: DashboardProps) => {
   return (
     <div className="min-h-screen px-6 md:px-12 pb-8" style={{ paddingTop: '60px' }}>
       <div className="max-w-7xl mx-auto">
-        <h1
-          className="text-center mb-12"
-          style={{
-            fontFamily: "'Bungee', sans-serif",
-            fontSize: 'clamp(2rem, 5vw, 3rem)',
-            fontWeight: 400,
-            color: '#ffffff',
-            textShadow: '-0.5px 0 #c5d94a, 0.5px 0 #c5d94a, 0 -0.5px #c5d94a, 0 0.5px #c5d94a, -0.5px -0.5px #c5d94a, 0.5px -0.5px #c5d94a, -0.5px 0.5px #c5d94a, 0.5px 0.5px #c5d94a',
-            letterSpacing: '0.05em',
-          }}
-        >
-          Dashboard
-        </h1>
+        <div className="flex justify-between items-center mb-12">
+          <h1
+            className="text-center flex-1"
+            style={{
+              fontFamily: "'Bungee', sans-serif",
+              fontSize: 'clamp(2rem, 5vw, 3rem)',
+              fontWeight: 400,
+              color: '#ffffff',
+              textShadow: '-0.5px 0 #c5d94a, 0.5px 0 #c5d94a, 0 -0.5px #c5d94a, 0 0.5px #c5d94a, -0.5px -0.5px #c5d94a, 0.5px -0.5px #c5d94a, -0.5px 0.5px #c5d94a, 0.5px 0.5px #c5d94a',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Dashboard
+          </h1>
+        </div>
 
         {/* First Row: Recent Matches (Full Width) */}
         <div className="mb-12">

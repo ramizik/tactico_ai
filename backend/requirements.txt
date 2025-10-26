@@ -45,3 +45,6 @@ requests==2.31.0
 # Letta AI Integration - Intelligent sports coaching
 letta-client
 tqdm>=4.66.0  # Progress bars for video processing
+
+# Reka AI Integration
+# Note: httpx and python-dotenv are already included above
