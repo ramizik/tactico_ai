@@ -26,109 +26,17 @@ class VideoProcessor:
     Handles chunked video uploads and analysis
     """
 
-    def __init__(self, device: str = 'cpu'):
-        self.device = device
-        self._validate_device_configuration()
+    def __init__(self):
+        """
+        Initialize video processor
+
+        Note: YOLO automatically detects and uses GPU if available
+        """
         self.temp_dir = tempfile.mkdtemp(prefix='tactico_video_')
         self.ffmpeg_path = self._find_ffmpeg()
-        logger.info(f"VideoProcessor initialized with device: {device}")
+        logger.info(f"VideoProcessor initialized")
         logger.info(f"Temp directory: {self.temp_dir}")
         logger.info(f"FFmpeg path: {self.ffmpeg_path}")
-
-    def _validate_device_configuration(self):
-        """
-        Validate that the requested device is available and properly configured.
-        Provides helpful error messages if configuration is incorrect.
-        """
-        try:
-            import torch
-
-            if self.device == 'cuda':
-                if not torch.cuda.is_available():
-                    error_msg = (
-                        "\n" + "="*80 + "\n"
-                        "❌ CUDA GPU REQUESTED BUT NOT AVAILABLE\n"
-                        "="*80 + "\n"
-                        "You have ANALYSIS_DEVICE=cuda in your .env file, but CUDA is not available.\n"
-                        "\n"
-                        "Common causes:\n"
-                        "1. PyTorch was installed without CUDA support (CPU-only version)\n"
-                        "2. NVIDIA drivers are not installed or outdated\n"
-                        "3. No NVIDIA GPU is present in the system\n"
-                        "\n"
-                        "To fix this issue:\n"
-                        "\n"
-                        "Option 1: Install CUDA-enabled PyTorch (RECOMMENDED if you have NVIDIA GPU)\n"
-                        "  pip uninstall torch torchvision torchaudio -y\n"
-                        "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124\n"
-                        "\n"
-                        "Option 2: Use CPU instead (slower, but works without GPU)\n"
-                        "  Change ANALYSIS_DEVICE=cpu in your .env file\n"
-                        "\n"
-                        "To verify CUDA availability:\n"
-                        "  python -c \"import torch; print(f'CUDA: {torch.cuda.is_available()}')\"\n"
-                        "\n"
-                        f"Current PyTorch version: {torch.__version__}\n"
-                        "="*80 + "\n"
-                    )
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
-                else:
-                    logger.info(f"✓ CUDA is available: {torch.cuda.get_device_name(0)}")
-                    logger.info(f"✓ CUDA version: {torch.version.cuda}")
-
-            elif self.device == 'mps':
-                if not (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()):
-                    error_msg = (
-                        "\n" + "="*80 + "\n"
-                        "❌ MPS (Apple Silicon GPU) REQUESTED BUT NOT AVAILABLE\n"
-                        "="*80 + "\n"
-                        "You have ANALYSIS_DEVICE=mps in your .env file, but MPS is not available.\n"
-                        "\n"
-                        "This can happen if:\n"
-                        "1. You're not on a Mac with Apple Silicon (M1/M2/M3)\n"
-                        "2. Your macOS version is too old (need macOS 12.3+)\n"
-                        "3. PyTorch version doesn't support MPS\n"
-                        "\n"
-                        "To fix: Change ANALYSIS_DEVICE=cpu in your .env file\n"
-                        "="*80 + "\n"
-                    )
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
-                else:
-                    logger.info(f"✓ MPS (Apple Silicon GPU) is available")
-
-            elif self.device == 'cpu':
-                logger.info("✓ Using CPU for analysis (will be slower than GPU)")
-                if torch.cuda.is_available():
-                    logger.warning(
-                        "⚠️  Note: CUDA GPU is available but not being used. "
-                        "Set ANALYSIS_DEVICE=cuda in .env for 10-50x speedup!"
-                    )
-            else:
-                logger.warning(f"Unknown device '{self.device}', falling back to CPU")
-                self.device = 'cpu'
-
-        except ImportError:
-            error_msg = (
-                "\n" + "="*80 + "\n"
-                "❌ PYTORCH NOT INSTALLED\n"
-                "="*80 + "\n"
-                "PyTorch is required for video analysis.\n"
-                "\n"
-                "Install PyTorch:\n"
-                "  # For NVIDIA GPU:\n"
-                "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124\n"
-                "\n"
-                "  # For CPU-only:\n"
-                "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu\n"
-                "\n"
-                "Then install other requirements:\n"
-                "  pip install -r requirements.txt\n"
-                "="*80 + "\n"
-            )
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
 
     def _find_ffmpeg(self) -> str:
         """
@@ -248,52 +156,6 @@ class VideoProcessor:
             logger.error(f"Error combining local chunks: {e}")
             return None
 
-    def combine_preview_chunks(self, team_id: str, match_id: str, preview_chunks: int) -> str:
-        """
-        Combine only the first N chunks for preview analysis
-
-        Args:
-            team_id: Team ID for the video
-            match_id: Match ID for the video
-            preview_chunks: Number of chunks to combine for preview (typically 10)
-
-        Returns:
-            str: Path to the combined preview video file, or None if failed
-        """
-        try:
-            # Get chunk paths using cross-platform path handling
-            chunk_paths = []
-            for i in range(preview_chunks):
-                chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
-                chunk_path = self._normalize_path(chunk_path)
-                if os.path.exists(chunk_path):
-                    chunk_size = os.path.getsize(chunk_path)
-                    logger.info(f"Found preview chunk {i}: {chunk_path} ({chunk_size} bytes)")
-                    chunk_paths.append(chunk_path)
-                else:
-                    logger.error(f"Preview chunk not found: {chunk_path}")
-                    return None
-
-            if len(chunk_paths) != preview_chunks:
-                logger.error(f"Expected {preview_chunks} preview chunks, found {len(chunk_paths)}")
-                return None
-
-            # Create output path for preview video
-            output_path = os.path.join("video_storage", team_id, match_id, "preview_video.mp4")
-            output_path = self._normalize_path(output_path)
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-            # Merge preview chunks
-            success = self.merge_video_chunks(chunk_paths, output_path)
-            if success:
-                logger.info(f"Preview video chunks combined successfully: {output_path}")
-                return output_path
-            else:
-                return None
-
-        except Exception as e:
-            logger.error(f"Error combining preview chunks: {e}")
-            return None
 
     def merge_video_chunks(self, chunk_paths: List[str], output_path: str) -> bool:
         """
@@ -453,69 +315,37 @@ class VideoProcessor:
             logger.error(f"Error in full analysis: {e}")
             return {"error": str(e)}
 
-    def run_enhanced_analysis(self, video_path: str, match_id: str, analysis_scope: str = "full") -> tuple:
+    def run_ml_analysis(self, video_path: str, match_id: str) -> tuple:
         """
-        Run enhanced split-screen analysis with ball tracking
+        Run ML analysis algorithm with player tracking and team assignment
 
         Args:
             video_path: Path to the video file
             match_id: Match ID from Supabase
-            analysis_scope: Scope of analysis ('preview' or 'full')
 
         Returns:
             tuple: (local_video_path, analysis_dict)
         """
         try:
-            logger.info(f"Starting enhanced analysis ({analysis_scope}) with split-screen output")
-            logger.info("Live preview window will open automatically")
+            logger.info(f"Starting ML analysis for match {match_id}")
 
-            # Set up environment and run enhanced analysis
-            env = os.environ.copy()
+            # Import and use the ml analysis processor
+            from ml_analysis_processor import process_video_with_ml_analysis
 
-            # Add video_analysis directory to PYTHONPATH
-            if 'PYTHONPATH' in env:
-                if os.name == 'nt':  # Windows
-                    env['PYTHONPATH'] = f"{VIDEO_ANALYSIS_PATH};{env['PYTHONPATH']}"
-                else:  # Unix-like
-                    env['PYTHONPATH'] = f"{VIDEO_ANALYSIS_PATH}:{env['PYTHONPATH']}"
-            else:
-                env['PYTHONPATH'] = VIDEO_ANALYSIS_PATH
+            output_path, analysis_data = process_video_with_ml_analysis(
+                video_path,
+                match_id
+            )
 
-            # Output path for enhanced video - add prefix for preview
-            output_dir = os.path.join('backend', 'video_outputs')
-            os.makedirs(output_dir, exist_ok=True)
-            output_prefix = "preview_" if analysis_scope == "preview" else ""
-            output_path = os.path.join(output_dir, f'{output_prefix}enhanced_{match_id}.mp4')
-
-            cmd = [
-                sys.executable,
-                os.path.join(VIDEO_ANALYSIS_PATH, 'examples', 'soccer', 'enhanced_supabase_analysis.py'),
-                '--source_video_path', video_path,
-                '--match_id', match_id,
-                '--device', self.device,
-                '--export_local',
-                '--show_preview',  # Always show live preview window
-                '--analysis_scope', analysis_scope  # Pass scope to analysis script
-            ]
-
-            logger.info(f"Running enhanced analysis with command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-
-            if result.returncode == 0:
-                logger.info(f"Enhanced analysis completed successfully")
-                # Return the expected output path and a basic analysis dict
-                analysis_data = {
-                    "analysis_type": "enhanced_analysis",
-                    "summary": "Enhanced split-screen analysis completed",
-                    "video_path": output_path
-                }
+            if output_path and os.path.exists(output_path):
+                logger.info(f"ML analysis completed successfully: {output_path}")
                 return output_path, analysis_data
             else:
-                logger.error(f"Enhanced analysis failed: {result.stderr}")
-                return None, {"error": result.stderr}
+                logger.error("ML analysis failed: No output video generated")
+                return None, {"error": "No output video generated"}
 
         except Exception as e:
-            logger.error(f"Error running enhanced analysis: {e}")
+            logger.error(f"Error running ML analysis: {e}")
             return None, {"error": str(e)}
 
     def _run_video_analysis(self, video_path: str, analysis_type: str) -> Dict:
@@ -655,88 +485,65 @@ class VideoProcessor:
             logger.error(f"Error cleaning up: {e}")
 
 
-def run_quick_brief_from_chunks(team_id: str, match_id: str, total_chunks: int, device: str = 'cpu') -> Dict:
+def run_ml_analysis_from_chunks(team_id: str, match_id: str, total_chunks: int) -> tuple:
     """
-    Run quick brief analysis on locally stored video chunks
+    Run ML analysis on locally stored video chunks
 
     Args:
         team_id: Team ID for the video
         match_id: Match ID for the video
         total_chunks: Total number of chunks
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
 
     Returns:
-        Dict: Analysis results
+        tuple: (output_video_path, analysis_data)
+
+    Note: YOLO automatically detects and uses GPU if available
     """
-    processor = VideoProcessor(device=device)
+    processor = VideoProcessor()
     try:
         # Combine chunks first
         combined_video_path = processor.combine_local_chunks(team_id, match_id, total_chunks)
         if not combined_video_path:
-            return {"error": "Failed to combine video chunks"}
+            return None, {"error": "Failed to combine video chunks"}
 
-        # Run quick brief analysis
-        return processor.run_quick_brief(combined_video_path)
+        # Run ML analysis
+        return processor.run_ml_analysis(combined_video_path, match_id)
     finally:
         processor.cleanup()
 
 
-def run_full_analysis_from_chunks(team_id: str, match_id: str, total_chunks: int, device: str = 'cpu') -> Dict:
-    """
-    Run full analysis on locally stored video chunks
-
-    Args:
-        team_id: Team ID for the video
-        match_id: Match ID for the video
-        total_chunks: Total number of chunks
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
-
-    Returns:
-        Dict: Analysis results
-    """
-    processor = VideoProcessor(device=device)
-    try:
-        # Combine chunks first
-        combined_video_path = processor.combine_local_chunks(team_id, match_id, total_chunks)
-        if not combined_video_path:
-            return {"error": "Failed to combine video chunks"}
-
-        # Run full analysis
-        return processor.run_full_analysis(combined_video_path)
-    finally:
-        processor.cleanup()
-
-
-def run_quick_brief(video_path: str, device: str = 'cpu') -> Dict:
+def run_quick_brief(video_path: str) -> Dict:
     """
     Convenience function to run quick brief analysis
 
     Args:
         video_path: Path to the video file
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
 
     Returns:
         Dict: Analysis results
+
+    Note: YOLO automatically detects and uses GPU if available
     """
-    processor = VideoProcessor(device=device)
+    processor = VideoProcessor()
     try:
         return processor.run_quick_brief(video_path)
     finally:
         processor.cleanup()
 
 
-def run_full_analysis(video_path: str, device: str = 'cpu') -> Dict:
+def run_full_analysis(video_path: str) -> Dict:
     """
     Convenience function to run full analysis
 
     Args:
         video_path: Path to the video file
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
 
     Returns:
         Dict: Analysis results
+
+    Note: YOLO automatically detects and uses GPU if available
     """
-    processor = VideoProcessor(device=device)
+    processor = VideoProcessor()
     try:
         return processor.run_full_analysis(video_path)
     finally:
@@ -750,11 +557,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Test Video Processor')
     parser.add_argument('--video_path', type=str, required=True, help='Path to video file')
     parser.add_argument('--analysis_type', type=str, choices=['quick_brief', 'full_analysis'], required=True)
-    parser.add_argument('--device', type=str, default='cpu', help='Device to use')
 
     args = parser.parse_args()
 
-    processor = VideoProcessor(device=args.device)
+    processor = VideoProcessor()
 
     try:
         if args.analysis_type == 'quick_brief':
