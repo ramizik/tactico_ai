@@ -635,10 +635,12 @@ async def upload_video_chunk(
         # Read chunk content
         chunk_content = await file.read()
 
-        # Save chunk to local storage
+        # Save chunk to local storage with proper flushing to ensure data is written to disk
         try:
             with open(chunk_path, "wb") as f:
                 f.write(chunk_content)
+                f.flush()  # Flush Python buffer
+                os.fsync(f.fileno())  # Force OS to write to disk
             print(f"Chunk saved locally: {chunk_path}")
         except Exception as storage_error:
             print(f"Local storage error: {storage_error}")
