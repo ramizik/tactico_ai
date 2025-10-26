@@ -1,10 +1,11 @@
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import coachImage from '../assets/7bfaab3066f6ffb1c8b4b53ce7e35a1b4a681d8a.png';
 import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { matchesApi } from '../lib/api';
 import type { Match } from '../types/api';
+import { RekaVideoAnalysisButton } from '../plugins';
 
 interface DashboardProps {
   onMatchClick: () => void;
@@ -38,19 +39,24 @@ export const Dashboard = ({ onMatchClick }: DashboardProps) => {
   return (
     <div className="min-h-screen px-6 md:px-12 pb-8" style={{ paddingTop: '60px' }}>
       <div className="max-w-7xl mx-auto">
-        <h1
-          className="text-center mb-12"
-          style={{
-            fontFamily: "'Bungee', sans-serif",
-            fontSize: 'clamp(2rem, 5vw, 3rem)',
-            fontWeight: 400,
-            color: '#ffffff',
-            textShadow: '-0.5px 0 #c5d94a, 0.5px 0 #c5d94a, 0 -0.5px #c5d94a, 0 0.5px #c5d94a, -0.5px -0.5px #c5d94a, 0.5px -0.5px #c5d94a, -0.5px 0.5px #c5d94a, 0.5px 0.5px #c5d94a',
-            letterSpacing: '0.05em',
-          }}
-        >
-          Dashboard
-        </h1>
+        <div className="flex justify-between items-center mb-12">
+          <h1
+            className="text-center flex-1"
+            style={{
+              fontFamily: "'Bungee', sans-serif",
+              fontSize: 'clamp(2rem, 5vw, 3rem)',
+              fontWeight: 400,
+              color: '#ffffff',
+              textShadow: '-0.5px 0 #c5d94a, 0.5px 0 #c5d94a, 0 -0.5px #c5d94a, 0 0.5px #c5d94a, -0.5px -0.5px #c5d94a, 0.5px -0.5px #c5d94a, -0.5px 0.5px #c5d94a, 0.5px 0.5px #c5d94a',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Dashboard
+          </h1>
+          
+          {/* Reka AI Button */}
+          <RekaVideoAnalysisButton />
+        </div>
 
         {/* First Row: Recent Matches (Full Width) */}
         <div className="mb-12">

@@ -63,6 +63,17 @@ except Exception as e:
     print(f"Letta client initialization failed: {e}")
     letta_client = None
 
+# Import Reka client
+try:
+    from tactico_reka_client import reka_client
+    print("Reka client loaded successfully")
+except ImportError as e:
+    print(f"Reka client import failed: {e}")
+    reka_client = None
+except Exception as e:
+    print(f"Reka client initialization failed: {e}")
+    reka_client = None
+
 import logging
 from datetime import datetime, timedelta
 
@@ -894,6 +905,248 @@ async def test_letta():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Letta AI test failed: {str(e)}")
+
+
+# ==================== Reka AI Endpoints ====================
+
+@app.post("/api/reka/analyze-video")
+async def analyze_video_with_reka(
+    file: UploadFile = File(...),
+    prompt: Optional[str] = Form(None)
+):
+    """
+    Analyze a video using Reka AI
+    
+    This endpoint temporarily replaces the normal analysis flow to test Reka AI integration.
+    Upload a video file and get AI-generated analysis.
+    """
+    if not reka_client:
+        raise HTTPException(status_code=503, detail="Reka AI not configured. Please set REKA_API_KEY in environment.")
+    
+    try:
+        # Save uploaded file temporarily (works on both Windows and Unix)
+        temp_dir = Path("temp_reka_uploads")
+        temp_dir.mkdir(exist_ok=True)
+        temp_video_path = str(temp_dir / f"temp_reka_video_{uuid.uuid4()}.mp4")
+        
+        with open(temp_video_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        logger.info(f"Video saved to {temp_video_path}, starting Reka analysis...")
+        
+        # Use Reka to analyze the video
+        analysis_prompt = prompt or "Analyze this sports video. Describe the gameplay, actions, and provide tactical insights."
+        analysis_result = await reka_client.analyze_video(temp_video_path, analysis_prompt)
+        
+        # Clean up temp file
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
+        
+        if analysis_result:
+            return {
+                "status": "success",
+                "analysis": analysis_result,
+                "file_name": file.filename
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Reka analysis returned no results")
+            
+    except Exception as e:
+        logger.error(f"Reka analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Reka analysis failed: {str(e)}")
+
+
+@app.post("/api/reka/upload-demo")
+async def upload_video_demo(
+    file: UploadFile = File(...)
+):
+    """
+    Upload a video for Reka demo
+    """
+    if not reka_client:
+        raise HTTPException(status_code=503, detail="Reka AI not configured. Please set REKA_API_KEY in environment.")
+    
+    try:
+        # Save uploaded file temporarily
+        temp_dir = Path("temp_reka_uploads")
+        temp_dir.mkdir(exist_ok=True)
+        temp_video_path = str(temp_dir / f"demo_video_{uuid.uuid4()}.mp4")
+        
+        with open(temp_video_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Upload to Reka
+        video_id = await reka_client.upload_video_only(temp_video_path)
+        
+        # Clean up temp file
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
+        
+        if video_id:
+            return {
+                "status": "success",
+                "video_id": video_id,
+                "file_name": file.filename
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to upload video to Reka")
+            
+    except Exception as e:
+        logger.error(f"Reka upload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+@app.post("/api/reka/search-demo")
+async def search_videos_demo(request: dict):
+    """
+    Search across videos using Reka AI
+    """
+    if not reka_client:
+        raise HTTPException(status_code=503, detail="Reka AI not configured.")
+    
+    try:
+        query = request.get("query", "")
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        # Perform search
+        results = await reka_client.search_videos(query)
+        
+        return {
+            "status": "success",
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Reka search failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@app.post("/api/reka/analyze-demo")
+async def analyze_video_demo(request: dict):
+    """
+    Analyze a specific video using Reka AI and convert to speech
+    """
+    if not reka_client:
+        raise HTTPException(status_code=503, detail="Reka AI not configured.")
+    
+    try:
+        video_id = request.get("video_id")
+        prompt = request.get("prompt", "Analyze this video in detail.")
+        
+        if not video_id:
+            raise HTTPException(status_code=400, detail="video_id is required")
+        
+        # Perform analysis
+        analysis = await reka_client.analyze_by_id(video_id, prompt)
+        
+        # Convert text to speech using Fish Audio
+        audio_path = None
+        if analysis:
+            try:
+                from tactico_fish_audio_client import generate_speech_from_text, play_reka_audio_directly
+                import os
+                
+                logger.info("Generating speech from Reka analysis...")
+                
+                                # Play audio on backend AND generate file for frontend
+                logger.info(f"Sending Reka analysis to Fish Audio: {len(analysis)} characters")
+                audio_file = play_reka_audio_directly(analysis)
+                
+                if audio_file and Path(audio_file).exists():
+                    # Extract just the filename for the frontend
+                    audio_filename = Path(audio_file).name
+                    audio_path = audio_file
+                    logger.info(f"Audio file ready for frontend: {audio_path}")
+                else:
+                    logger.warning("Audio file not created by play_reka_audio_directly, trying generate_speech_from_text")
+                    # Fallback: generate audio file
+                    temp_audio_dir = Path("temp_reka_uploads")
+                    temp_audio_dir.mkdir(exist_ok=True)
+                    audio_filename = f"reka_audio_{uuid.uuid4().hex[:12]}.wav"
+                    audio_path = temp_audio_dir / audio_filename
+                    
+                    # Generate speech and save to file
+                    audio_bytes = generate_speech_from_text(
+                        text=analysis,
+                        output_file=str(audio_path),
+                        model_id="77fb1472a0f54b358ef95fab9d80139a"
+                    )
+                    
+                    # Check if audio was actually generated
+                    if len(audio_bytes) == 0:
+                        logger.warning("Fish Audio returned empty audio")
+                        audio_filename = None
+                    else:
+                        logger.info(f"Speech audio generated at: {audio_path} ({len(audio_bytes)} bytes)")
+                    
+            except Exception as audio_error:
+                logger.error(f"Audio generation failed: {audio_error}")
+                logger.exception("Full audio generation error:")
+                audio_path = None
+                audio_filename = None
+                # Continue without audio
+        
+        # Prepare response
+        response_data = {
+            "status": "success",
+            "analysis": analysis
+        }
+        
+        # If audio was generated, include the file path
+        # The frontend will need to download it
+        if 'audio_filename' in locals() and audio_filename:
+            response_data["audio_filename"] = audio_filename
+            response_data["audio_url"] = f"/api/reka/audio/{audio_filename}"
+            logger.info(f"Added audio_url to response: {response_data['audio_url']}")
+        else:
+            logger.info("No audio_filename found, skipping audio_url in response")
+            
+        logger.info(f"Returning response with keys: {response_data.keys()}")
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"Reka analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@app.get("/api/reka/audio/{filename}")
+async def get_audio_file(filename: str):
+    """
+    Download generated audio file
+    
+    Args:
+        filename: Name of the audio file (e.g., 'reka_audio_XXXXXX.wav')
+    """
+    try:
+        # Construct the full path
+        audio_path = Path("temp_reka_uploads") / filename
+        
+        if not audio_path.exists():
+            logger.error(f"Audio file not found: {audio_path}")
+            raise HTTPException(status_code=404, detail=f"Audio file not found: {filename}")
+        
+        # Determine content type based on extension
+        if filename.lower().endswith('.wav'):
+            media_type = "audio/wav"
+        elif filename.lower().endswith('.mp3'):
+            media_type = "audio/mpeg"
+        else:
+            media_type = "audio/mpeg"
+        
+        logger.info(f"Serving audio file: {audio_path} ({audio_path.stat().st_size} bytes)")
+        
+        return FileResponse(
+            path=str(audio_path),
+            media_type=media_type,
+            filename=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to serve audio file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to serve audio file: {str(e)}")
 
 
 # ==================== Cleanup Functions ====================
