@@ -46,9 +46,5 @@ requests==2.31.0
 letta-client
 tqdm>=4.66.0  # Progress bars for video processing
 
-# Reka-AI
-reka-api
-
-# Fish Audio SDK
-fish-audio-sdk
-pyaudio
+# Reka AI Integration
+# Note: httpx and python-dotenv are already included above

@@ -1,9 +1,9 @@
-import { History, LayoutDashboard, Users } from 'lucide-react';
+import { History, LayoutDashboard, Users, Sparkles } from 'lucide-react';
 import uopLogo from '../assets/6f52a6f51b1118f22614d64aa4f3ac3088637952.png';
 import ucLogo from '../assets/9717c66175f8bd785a58b86d4b7ddb44dd1476d2.png';
 import { useTheme } from '../contexts/ThemeContext';
 
-type Page = 'dashboard' | 'past-games' | 'my-team';
+type Page = 'dashboard' | 'past-games' | 'my-team' | 'quick-analysis';
 
 interface NavigationProps {
   currentPage: Page;
@@ -17,6 +17,7 @@ export const Navigation = ({ currentPage, onNavigate }: NavigationProps) => {
     { id: 'dashboard' as Page, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'past-games' as Page, label: 'Past Games', icon: History },
     { id: 'my-team' as Page, label: 'My Team', icon: Users },
+    { id: 'quick-analysis' as Page, label: 'Quick Analysis', icon: Sparkles },
   ];
 
   return (

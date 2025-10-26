@@ -1,11 +1,10 @@
-import { TrendingUp, Sparkles } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import coachImage from '../assets/7bfaab3066f6ffb1c8b4b53ce7e35a1b4a681d8a.png';
 import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { matchesApi } from '../lib/api';
 import type { Match } from '../types/api';
-import { RekaVideoAnalysisButton } from '../plugins';
 
 interface DashboardProps {
   onMatchClick: () => void;
@@ -53,9 +52,6 @@ export const Dashboard = ({ onMatchClick }: DashboardProps) => {
           >
             Dashboard
           </h1>
-          
-          {/* Reka AI Button */}
-          <RekaVideoAnalysisButton />
         </div>
 
         {/* First Row: Recent Matches (Full Width) */}

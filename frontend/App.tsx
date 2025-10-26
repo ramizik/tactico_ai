@@ -7,13 +7,14 @@ import { IntroPage } from './components/IntroPage';
 import { MyTeam } from './components/MyTeam';
 import { Navigation } from './components/Navigation';
 import { PastGames } from './components/PastGames';
+import { QuickAnalysis } from './components/QuickAnalysis';
 import { SelectionPage } from './components/SelectionPage';
 import { ThemedBackground } from './components/ThemedBackground';
 import { SessionProvider } from './contexts/SessionContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
 type AppState = 'intro' | 'selection' | 'app';
-type Page = 'dashboard' | 'past-games' | 'my-team' | 'add-match';
+type Page = 'dashboard' | 'past-games' | 'my-team' | 'add-match' | 'quick-analysis';
 
 /**
  * Floating AI Chat Button
@@ -66,6 +67,7 @@ function AppContent() {
           )}
           {currentPage === 'past-games' && <PastGames />}
           {currentPage === 'my-team' && <MyTeam />}
+          {currentPage === 'quick-analysis' && <QuickAnalysis />}
           {currentPage === 'add-match' && (
             <AddMatch
               onBack={() => setCurrentPage('dashboard')}
