@@ -234,6 +234,50 @@ class VideoProcessor:
                 final_size = os.path.getsize(output_path)
                 logger.info(f"Combined video exists: {output_path}, size: {final_size} bytes")
 
+                # IMPORTANT: Remux the concatenated file to ensure it's OpenCV-compatible
+                # Binary concatenation works but the result needs proper MP4 structure
+                logger.info("Remuxing concatenated file to ensure proper MP4 structure...")
+                temp_remux_output = output_path + ".remuxed.mp4"
+
+                try:
+                    remux_cmd = [
+                        self.ffmpeg_path,
+                        '-i', output_path,
+                        '-c', 'copy',  # No re-encoding, just copy streams
+                        '-movflags', '+faststart',  # Optimize for streaming
+                        '-y',
+                        temp_remux_output
+                    ]
+
+                    # Set timeout based on file size
+                    remux_timeout = max(120, int(final_size / 10_000_000))  # 1 second per 10MB, min 2 minutes
+                    logger.info(f"Remuxing with timeout of {remux_timeout} seconds...")
+
+                    remux_result = subprocess.run(remux_cmd, capture_output=True, text=True, timeout=remux_timeout)
+
+                    if remux_result.returncode == 0 and os.path.exists(temp_remux_output):
+                        # Replace original with remuxed version
+                        os.replace(temp_remux_output, output_path)
+                        logger.info("✅ Successfully remuxed video - now OpenCV-compatible")
+                        return True
+                    else:
+                        logger.warning(f"Remuxing had issues but will try to proceed: {remux_result.stderr[:200]}")
+                        # Clean up temp file if it exists
+                        if os.path.exists(temp_remux_output):
+                            os.remove(temp_remux_output)
+                        # Continue with original file
+
+                except subprocess.TimeoutExpired:
+                    logger.error(f"Remuxing timed out after {remux_timeout} seconds")
+                    if os.path.exists(temp_remux_output):
+                        os.remove(temp_remux_output)
+                    return False
+                except Exception as remux_error:
+                    logger.error(f"Remuxing failed: {remux_error}")
+                    if os.path.exists(temp_remux_output):
+                        os.remove(temp_remux_output)
+                    # Try to continue with original
+
                 # For large files, skip or use longer timeout for validation
                 if final_size > 500_000_000:  # If over 500MB
                     logger.info(f"Large file ({final_size/1_000_000:.1f}MB), skipping detailed validation")

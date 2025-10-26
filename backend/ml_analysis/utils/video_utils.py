@@ -15,23 +15,94 @@ def read_video(video_path):
         print(f"Error: Video file not found: {video_path}")
         return []
 
+    # Get video info first
+    file_size = os.path.getsize(video_path)
+    print(f"Reading video: {video_path}")
+    print(f"File size: {file_size / (1024*1024):.2f} MB")
+
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
         print(f"Error: Cannot open video file: {video_path}")
+        print(f"File exists: {os.path.exists(video_path)}, Size: {file_size} bytes")
         return []
 
+    # Get video properties
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    print(f"Video properties: {width}x{height}, {fps} FPS, {total_frames} frames")
+    print(f"Estimated duration: {total_frames/fps:.1f} seconds")
+
     frames = []
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frames.append(frame)
+    frame_count = 0
+    error_count = 0
+    max_consecutive_errors = 10  # Stop if we hit 10 errors in a row
+    consecutive_errors = 0
 
-    cap.release()
+    try:
+        while True:
+            try:
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
+                if frame is None:
+                    print(f"Warning: Frame {frame_count} is None, skipping")
+                    consecutive_errors += 1
+                    if consecutive_errors >= max_consecutive_errors:
+                        print(f"Too many consecutive errors ({consecutive_errors}), stopping")
+                        break
+                    continue
+
+                frames.append(frame)
+                frame_count += 1
+                consecutive_errors = 0  # Reset on successful read
+
+                # Progress indicator for large videos
+                if frame_count % 1000 == 0:
+                    progress = (frame_count / total_frames * 100) if total_frames > 0 else 0
+                    print(f"Reading frames: {frame_count}/{total_frames} ({progress:.1f}%)")
+
+            except Exception as frame_error:
+                error_count += 1
+                consecutive_errors += 1
+
+                if consecutive_errors >= max_consecutive_errors:
+                    print(f"Too many consecutive errors ({consecutive_errors}), stopping read")
+                    break
+
+                # For isolated errors, just skip the frame
+                if error_count <= 100:  # Allow up to 100 bad frames total
+                    print(f"Warning: Error reading frame {frame_count}, skipping: {frame_error}")
+                    continue
+                else:
+                    print(f"Too many total errors ({error_count}), stopping")
+                    break
+
+    except Exception as e:
+        print(f"Fatal error during video read at frame {frame_count}: {type(e).__name__}: {str(e)}")
+
+    finally:
+        cap.release()
+
+    # Evaluate what we got
     if len(frames) == 0:
-        print(f"Warning: No frames read from video: {video_path}")
+        print(f"Error: No frames successfully read from video")
+        if error_count > 0:
+            raise Exception(f"Failed to read video: encountered {error_count} errors, no valid frames")
+        return []
+    elif len(frames) < 100:
+        print(f"Error: Only {len(frames)} frames read, not enough for analysis")
+        raise Exception(f"Insufficient frames: only {len(frames)} frames read from video")
+    elif error_count > 0:
+        print(f"⚠️  Video read completed with {error_count} errors")
+        print(f"✅ Successfully read {len(frames)} frames ({len(frames) / fps:.1f} seconds)")
+        print(f"Analysis will proceed with available frames")
+    else:
+        print(f"✅ Successfully read all {len(frames)} frames")
 
     return frames
 
