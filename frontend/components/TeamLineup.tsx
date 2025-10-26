@@ -7,7 +7,7 @@
  * - PUT /api/teams/{teamId}/formation to save formation changes
  */
 
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, UserPlus, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
@@ -20,6 +20,12 @@ interface Player {
     stats: { goals: number; assists: number; rating: number };
     avatar: string;
     club?: string;
+}
+
+interface TeamLineupProps {
+    players: Player[];
+    onPlayerClick?: (player: Player) => void;
+    onAddPlayer?: () => void;
 }
 
 type Formation = '4-3-3' | '4-4-2' | '3-4-3' | '4-2-3-1';
@@ -75,26 +81,61 @@ const formations: FormationPositions = {
 
 interface TeamLineupProps {
     players: Player[];
+    onPlayerClick?: (player: Player) => void;
 }
 
-export const TeamLineup = ({ players }: TeamLineupProps) => {
+export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupProps) => {
     const { theme, university } = useTheme();
     const [formation, setFormation] = useState<Formation>('4-3-3');
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
     const [isFormationOpen, setIsFormationOpen] = useState(false);
+    const [draggedPlayer, setDraggedPlayer] = useState<{ player: Player; position: { x: number; y: number } } | null>(null);
+    const [customPositions, setCustomPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
 
-    // Get top 11 players by rating
-    const topPlayers = [...players]
+    // Get top 11 players by rating, then organize by position
+    const topPlayersUnsorted = [...players]
         .sort((a, b) => b.stats.rating - a.stats.rating)
         .slice(0, 11);
+    
+    // Organize by position: Goalkeeper -> Defenders -> Midfielders -> Forwards
+    const getPositionPriority = (pos: string) => {
+        const posLower = pos.toLowerCase();
+        if (posLower.includes('goalkeeper') || posLower.includes('keeper')) return 0;
+        if (posLower.includes('defender')) return 1;
+        if (posLower.includes('midfielder') || posLower.includes('midfield')) return 2;
+        if (posLower.includes('forward') || posLower.includes('striker') || posLower.includes('winger')) return 3;
+        return 4;
+    };
+    
+    const topPlayers = [...topPlayersUnsorted]
+        .sort((a, b) => {
+            const posA = getPositionPriority(a.position);
+            const posB = getPositionPriority(b.position);
+            if (posA !== posB) return posA - posB;
+            // If same position, sort by rating
+            return b.stats.rating - a.stats.rating;
+        });
+
+    // Handle custom position for a player
+    const handlePlayerDrag = (player: { player: Player; position: { x: number; y: number } }, newX: number, newY: number) => {
+        const newPositions = new Map(customPositions);
+        newPositions.set(player.player.id, { x: newX, y: newY });
+        setCustomPositions(newPositions);
+    };
 
     // Distribute players across formation positions
     const getPlayerPositions = () => {
         const positions = formations[formation].flat();
-        return topPlayers.map((player, index) => ({
-            player,
-            position: positions[index] || { x: 50, y: 50 },
-        }));
+        return topPlayers.map((player, index) => {
+            // Check if player has custom position
+            const customPos = customPositions.get(player.id);
+            const defaultPos = positions[index] || { x: 50, y: 50 };
+            
+            return {
+                player,
+                position: customPos || defaultPos,
+            };
+        });
     };
 
     const playerPositions = getPlayerPositions();
@@ -117,111 +158,39 @@ export const TeamLineup = ({ players }: TeamLineupProps) => {
                         color: theme.secondary,
                     }}
                 >
-                    Team of the Season
+                    Team Sheet
                 </h2>
 
-                {/* Formation Selector */}
-                <div className="relative">
+                <div className="flex items-center gap-3">
+                    {/* Add Player Button */}
                     <button
-                        onClick={() => setIsFormationOpen(!isFormationOpen)}
-                        className="flex items-center gap-3 px-6 py-3 bg-white border-4 transition-all hover:scale-105"
+                        onClick={() => {
+                            if (onAddPlayer) {
+                                onAddPlayer();
+                            }
+                        }}
+                        className="flex items-center gap-2 px-5 py-2 bg-white border-4 transition-all hover:scale-105"
                         style={{
                             borderColor: theme.accent,
                             fontWeight: 800,
+                            fontSize: '0.9375rem',
                         }}
                     >
-                        {/* Mini Formation Visualization */}
-                        <div
-                            className="relative flex-shrink-0"
-                            style={{
-                                width: '32px',
-                                height: '48px',
-                                backgroundColor: '#1a4d2e',
-                                borderRadius: '2px',
-                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                            }}
-                        >
-                            {/* Formation dots */}
-                            {formations[formation].flat().map((pos, i) => (
-                                <div
-                                    key={i}
-                                    className="absolute rounded-full"
-                                    style={{
-                                        width: '4px',
-                                        height: '4px',
-                                        backgroundColor: '#ffffff',
-                                        left: `${pos.x * 0.32 - 2}px`,
-                                        top: `${pos.y * 0.48 - 2}px`,
-                                        boxShadow: '0 0 2px rgba(0, 0, 0, 0.5)',
-                                    }}
-                                />
-                            ))}
-                        </div>
-
-                        <span style={{ fontSize: '1rem' }}>Formation: {formation}</span>
-                        <ChevronDown className="w-4 h-4" />
+                        <UserPlus className="w-5 h-5" />
+                        Add Player
                     </button>
-
-                    {isFormationOpen && (
-                        <div
-                            className="absolute right-0 top-full mt-2 bg-white border-4 shadow-xl z-10"
-                            style={{ borderColor: theme.accent, minWidth: '200px' }}
-                        >
-                            {(['4-3-3', '4-4-2', '3-4-3', '4-2-3-1'] as Formation[]).map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => {
-                                        setFormation(f);
-                                        setIsFormationOpen(false);
-                                    }}
-                                    className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-100 transition-colors"
-                                    style={{
-                                        fontWeight: formation === f ? 800 : 600,
-                                        backgroundColor: formation === f ? theme.accent + '20' : 'transparent',
-                                    }}
-                                >
-                                    {/* Mini Formation Visualization */}
-                                    <div
-                                        className="relative flex-shrink-0"
-                                        style={{
-                                            width: '28px',
-                                            height: '42px',
-                                            backgroundColor: '#1a4d2e',
-                                            borderRadius: '2px',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                                        }}
-                                    >
-                                        {formations[f].flat().map((pos, i) => (
-                                            <div
-                                                key={i}
-                                                className="absolute rounded-full"
-                                                style={{
-                                                    width: '3px',
-                                                    height: '3px',
-                                                    backgroundColor: '#ffffff',
-                                                    left: `${pos.x * 0.28 - 1.5}px`,
-                                                    top: `${pos.y * 0.42 - 1.5}px`,
-                                                    boxShadow: '0 0 1px rgba(0, 0, 0, 0.5)',
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                    <span>{f}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
                 </div>
             </div>
 
-            {/* Football Pitch Container */}
-            <div
-                className="relative w-full border-4 overflow-hidden"
-                style={{
-                    borderColor: theme.accent,
-                    aspectRatio: '2/5',
-                    maxHeight: '1100px',
-                    backgroundColor: '#1a4d2e',
+            {/* Grid Layout: Formation on left, Player list on right */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Side: Football Pitch Formation */}
+                <div
+                    className="relative border-4 overflow-hidden"
+                    style={{
+                        borderColor: theme.accent,
+                        aspectRatio: '3/4',
+                        backgroundColor: '#1a4d2e',
                     backgroundImage: `
             linear-gradient(0deg, transparent 24%, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 255, 255, 0.05) 75%, rgba(255, 255, 255, 0.05) 76%, transparent 77%, transparent),
             linear-gradient(90deg, transparent 24%, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 255, 255, 0.05) 75%, rgba(255, 255, 255, 0.05) 76%, transparent 77%, transparent)
@@ -316,10 +285,31 @@ export const TeamLineup = ({ players }: TeamLineupProps) => {
                     <button
                         key={player.id}
                         onClick={() => setSelectedPlayer(player)}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer"
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            setDraggedPlayer({ player, position });
+                        }}
+                        onMouseMove={(e) => {
+                            if (draggedPlayer && draggedPlayer.player.id === player.id) {
+                                e.preventDefault();
+                                const rect = e.currentTarget.closest('div[className*="grid"]')?.getBoundingClientRect();
+                                if (rect) {
+                                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                    handlePlayerDrag(draggedPlayer, Math.max(5, Math.min(95, x)), Math.max(5, Math.min(95, y)));
+                                }
+                            }
+                        }}
+                        onMouseUp={() => {
+                            if (draggedPlayer) {
+                                setDraggedPlayer(null);
+                            }
+                        }}
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 group cursor-move transition-all"
                         style={{
                             left: `${position.x}%`,
                             top: `${position.y}%`,
+                            zIndex: draggedPlayer?.player.id === player.id ? 50 : 10,
                         }}
                     >
                         {/* Card Container */}
@@ -496,6 +486,200 @@ export const TeamLineup = ({ players }: TeamLineupProps) => {
                         </div>
                     </button>
                 ))}
+                </div>
+
+                {/* Right Side: Player List */}
+                <div className="space-y-4">
+                    <div
+                        className="bg-white border-4 p-4"
+                        style={{ borderColor: theme.accent }}
+                    >
+                        {/* Formation Selector in Team Roster */}
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 
+                                style={{ 
+                                    fontSize: '1.25rem', 
+                                    fontWeight: 800, 
+                                    color: theme.secondary 
+                                }}
+                            >
+                                Team Roster
+                            </h3>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsFormationOpen(!isFormationOpen)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 transition-all hover:scale-105"
+                                    style={{
+                                        borderColor: theme.accent,
+                                        fontWeight: 700,
+                                        fontSize: '0.875rem',
+                                    }}
+                                >
+                                    <span>{formation}</span>
+                                    <ChevronDown className="w-4 h-4" />
+                                </button>
+
+                                {isFormationOpen && (
+                                    <div
+                                        className="absolute right-0 top-full mt-2 bg-white border-4 shadow-xl z-10"
+                                        style={{ borderColor: theme.accent, minWidth: '180px' }}
+                                    >
+                                        {(['4-3-3', '4-4-2', '3-4-3', '4-2-3-1'] as Formation[]).map((f) => (
+                                            <button
+                                                key={f}
+                                                onClick={() => {
+                                                    setFormation(f);
+                                                    setIsFormationOpen(false);
+                                                }}
+                                                className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-100 transition-colors text-sm"
+                                                style={{
+                                                    fontWeight: formation === f ? 800 : 600,
+                                                    backgroundColor: formation === f ? theme.accent + '20' : 'transparent',
+                                                }}
+                                            >
+                                                <span>{f}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                            {topPlayers.map((player, index) => (
+                                <div
+                                    key={player.id}
+                                    className="w-full flex items-center gap-3 p-3 border-2 transition-all hover:scale-105 hover:shadow-md"
+                                    style={{ 
+                                        borderColor: '#e5e5e5',
+                                        backgroundColor: 'white',
+                                    }}
+                                >
+                                    <button
+                                        onClick={() => setSelectedPlayer(player)}
+                                        className="flex-1 flex items-center gap-3"
+                                    >
+                                    {/* Rank Badge */}
+                                    <div
+                                        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold"
+                                        style={{
+                                            backgroundColor: index < 3 ? theme.accent : theme.primary,
+                                            color: 'white',
+                                            fontSize: '0.875rem',
+                                        }}
+                                    >
+                                        {index + 1}
+                                    </div>
+
+                                    {/* Player Avatar */}
+                                    <div
+                                        className="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0"
+                                        style={{
+                                            backgroundImage: `url(${player.avatar})`,
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center',
+                                        }}
+                                    />
+
+                                    {/* Player Info */}
+                                    <div className="flex-1 text-left min-w-0">
+                                        <div 
+                                            style={{ 
+                                                fontWeight: 800, 
+                                                fontSize: '0.9375rem',
+                                                color: '#000',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                            }}
+                                        >
+                                            {player.name}
+                                        </div>
+                                        <div 
+                                            style={{ 
+                                                fontSize: '0.75rem', 
+                                                color: '#666',
+                                            }}
+                                        >
+                                            {player.position} • #{player.number}
+                                        </div>
+                                    </div>
+
+                                    {/* Stats */}
+                                    <div className="flex-shrink-0 flex gap-3">
+                                        <div className="text-center">
+                                            <div 
+                                                style={{ 
+                                                    fontWeight: 800, 
+                                                    color: theme.primary,
+                                                    fontSize: '0.875rem',
+                                                }}
+                                            >
+                                                {player.stats.rating}
+                                            </div>
+                                            <div 
+                                                style={{ 
+                                                    fontSize: '0.625rem', 
+                                                    color: '#999' 
+                                                }}
+                                            >
+                                                Rating
+                                            </div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div 
+                                                style={{ 
+                                                    fontWeight: 800, 
+                                                    color: theme.accent,
+                                                    fontSize: '0.875rem',
+                                                }}
+                                            >
+                                                {player.stats.goals}
+                                            </div>
+                                            <div 
+                                                style={{ 
+                                                    fontSize: '0.625rem', 
+                                                    color: '#999' 
+                                                }}
+                                            >
+                                                Goals
+                                            </div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div 
+                                                style={{ 
+                                                    fontWeight: 800, 
+                                                    color: '#FF6B35',
+                                                    fontSize: '0.875rem',
+                                                }}
+                                            >
+                                                {player.stats.assists}
+                                            </div>
+                                            <div 
+                                                style={{ 
+                                                    fontSize: '0.625rem', 
+                                                    color: '#999' 
+                                                }}
+                                            >
+                                                Assists
+                                            </div>
+                                        </div>
+                                    </div>
+                                    </button>
+                                    
+                                    {/* Checkbox for multi-select */}
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 cursor-pointer"
+                                        onChange={(e) => {
+                                            e.stopPropagation();
+                                            // Handle multi-select logic here
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Player Detail Modal */}

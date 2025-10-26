@@ -280,18 +280,23 @@ async def create_player(
             "team_id": team_id,
             "name": name,
             "position": position,
-            "number": number,
+            "jersey_number": number,  # Fixed: database column is jersey_number
             "avatar_url": avatar_url,
             "stats": {
                 "goals": 0,
                 "assists": 0,
-                "rating": 0.0
+                "shots": 0,
+                "passes": 0,
+                "tackles": 0,
+                "rating": 0.0,
+                "minutes_played": 0
             }
         }
 
         result = supabase.table("players").insert(player_data).execute()
         return {"player": result.data[0]}
     except Exception as e:
+        logger.error(f"Error creating player: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 

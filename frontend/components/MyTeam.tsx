@@ -1,4 +1,5 @@
 import { Award, TrendingUp, UserPlus } from 'lucide-react';
+import { PlayerHeatmapModal } from './PlayerHeatmapModal';
 import { useEffect, useState } from 'react';
 import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -19,6 +20,7 @@ export const MyTeam = () => {
   const [players, setPlayers] = useState<ApiPlayer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddPlayerOpen, setIsAddPlayerOpen] = useState(false);
+  const [selectedPlayerForHeatmap, setSelectedPlayerForHeatmap] = useState<ApiPlayer | null>(null);
   const [newPlayer, setNewPlayer] = useState({
     name: '',
     position: '',
@@ -64,15 +66,23 @@ export const MyTeam = () => {
 
   const handleAddPlayer = async () => {
     if (!newPlayer.name || !newPlayer.position || !newPlayer.number || !teamId) {
-      return; // Basic validation
+      alert('Please fill in all required fields (Name, Number, and Position)');
+      return;
+    }
+
+    // Validate number range
+    const number = parseInt(newPlayer.number);
+    if (isNaN(number) || number < 1 || number > 99) {
+      alert('Jersey number must be between 1 and 99');
+      return;
     }
 
     try {
       const createdPlayer = await playersApi.create(teamId, {
-        name: newPlayer.name,
+        name: newPlayer.name.trim(),
         position: newPlayer.position,
-        number: parseInt(newPlayer.number) || 0,
-        avatar_url: newPlayer.avatar || undefined
+        number: number,
+        avatar_url: newPlayer.avatar?.trim() || undefined
       });
 
       setPlayers([...players, createdPlayer]);
@@ -85,7 +95,8 @@ export const MyTeam = () => {
       });
     } catch (error) {
       console.error('Failed to create player:', error);
-      alert('Failed to create player. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create player. Please try again.';
+      alert(errorMessage);
     }
   };
 
@@ -170,183 +181,76 @@ export const MyTeam = () => {
 
         {/* Team of the Season Lineup */}
         {!isLoading && players.length > 0 && (
-          <TeamLineup players={visualizationPlayers} />
+          <TeamLineup 
+            players={visualizationPlayers} 
+            onPlayerClick={(player) => {
+              // Find the original player object
+              const originalPlayer = players.find(p => String(p.id) === String(player.id));
+              if (originalPlayer) {
+                setSelectedPlayerForHeatmap(originalPlayer);
+              }
+            }}
+            onAddPlayer={() => setIsAddPlayerOpen(true)}
+          />
         )}
-
-        {/* Header Section */}
-        <div className="flex justify-between items-center mb-6">
-          <h2
-            style={{
-              fontSize: '1.75rem',
-              fontWeight: 800,
-              color: theme.secondary,
-            }}
-          >
-            Players
-          </h2>
-          <button
-            onClick={() => setIsAddPlayerOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-white border-4 transition-all hover:scale-105"
-            style={{
-              borderColor: theme.accent,
-              fontWeight: 800,
-            }}
-          >
-            <UserPlus className="w-5 h-5" />
-            Add Player
-          </button>
-        </div>
-
-        {/* Players Grid - 2 Column Layout */}
-        <div className="mb-8">
-          {isLoading ? (
-            <div className="text-center text-white py-12">
-              <div className="text-xl">Loading players...</div>
-            </div>
-          ) : players.length === 0 ? (
-            <div className="text-center text-white py-12">
-              <div className="text-xl mb-4">No players yet</div>
-              <div className="text-gray-300">Add your first player to get started</div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {players.map((player) => (
-                <div
-                  key={player.id}
-                  className="bg-white border-4 p-5 flex flex-col"
-                  style={{ borderColor: theme.accent }}
-                >
-                  <div className="flex items-start gap-3 mb-4">
-                    <div
-                      className="w-16 h-16 rounded-full bg-gray-200 flex-shrink-0"
-                      style={{
-                        backgroundImage: `url(${player.avatar_url || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }}
-                    />
-                    <div className="flex-1">
-                      <div style={{ fontWeight: 900, fontSize: '1.125rem', lineHeight: '1.3' }}>
-                        {player.name}
-                      </div>
-                      <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
-                        {player.position}
-                      </div>
-                      <div
-                        className="inline-block px-3 py-1 mt-2 text-white"
-                        style={{
-                          backgroundColor: theme.primary,
-                          fontWeight: 800,
-                          fontSize: '0.875rem',
-                        }}
-                      >
-                        #{player.jersey_number}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
-                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Goals</span>
-                      <span style={{ fontWeight: 800, fontSize: '1rem' }}>{player.stats.goals}</span>
-                    </div>
-                    <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
-                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Assists</span>
-                      <span style={{ fontWeight: 800, fontSize: '1rem' }}>{player.stats.assists}</span>
-                    </div>
-                    <div className="flex justify-between" style={{ fontSize: '0.9375rem' }}>
-                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Rating</span>
-                      <span
-                        style={{
-                          fontWeight: 900,
-                          fontSize: '1.125rem',
-                          color: theme.primary,
-                        }}
-                      >
-                        {player.stats.rating}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Add Player Dialog */}
         <Dialog open={isAddPlayerOpen} onOpenChange={setIsAddPlayerOpen}>
-          <DialogContent className="bg-white border-4 max-w-2xl" style={{ borderColor: theme.accent }}>
+          <DialogContent className="bg-white border-4 max-w-xl max-h-[85vh] overflow-y-auto" style={{ borderColor: theme.accent }}>
             <DialogHeader>
               <DialogTitle
                 style={{
-                  fontSize: '1.75rem',
+                  fontSize: '1.5rem',
                   fontWeight: 900,
                   color: theme.secondary
                 }}
               >
                 Add New Player
               </DialogTitle>
-              <DialogDescription className="text-gray-600">
-                Fill in the player details below to add them to your roster.
+              <DialogDescription className="text-sm text-gray-500">
+                Add a player to your team roster
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6 py-4">
-              {/* Avatar URL */}
-              <div>
-                <Label htmlFor="avatar" style={{ fontWeight: 700, fontSize: '0.875rem' }}>
-                  Player Photo URL
-                </Label>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    id="avatar"
-                    placeholder="https://example.com/photo.jpg"
-                    value={newPlayer.avatar}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, avatar: e.target.value })}
-                    className="flex-1 border-2"
-                    style={{ borderColor: theme.accent }}
-                  />
-                </div>
-                <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
-                  Paste an image URL or leave blank for default avatar
-                </p>
-              </div>
-
+            <div className="space-y-4 py-3">
+              {/* Name and Jersey Number Row */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Name */}
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="name" style={{ fontWeight: 700, fontSize: '0.875rem' }}>
-                    Player Name *
+                    Name *
                   </Label>
                   <Input
                     id="name"
-                    placeholder="e.g., Alex Johnson"
+                    placeholder="Alex Johnson"
                     value={newPlayer.name}
                     onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                    className="mt-2 border-2"
+                    className="h-10 border-2"
                     style={{ borderColor: theme.accent }}
                   />
                 </div>
 
                 {/* Jersey Number */}
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="number" style={{ fontWeight: 700, fontSize: '0.875rem' }}>
-                    Jersey Number *
+                    Number *
                   </Label>
                   <Input
                     id="number"
                     type="number"
+                    min="1"
+                    max="99"
                     placeholder="10"
                     value={newPlayer.number}
                     onChange={(e) => setNewPlayer({ ...newPlayer, number: e.target.value })}
-                    className="mt-2 border-2"
+                    className="h-10 border-2"
                     style={{ borderColor: theme.accent }}
                   />
                 </div>
               </div>
 
               {/* Position */}
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="position" style={{ fontWeight: 700, fontSize: '0.875rem' }}>
                   Position *
                 </Label>
@@ -355,7 +259,7 @@ export const MyTeam = () => {
                   onValueChange={(value: string) => setNewPlayer({ ...newPlayer, position: value })}
                 >
                   <SelectTrigger
-                    className="mt-2 border-2"
+                    className="h-10 border-2"
                     style={{ borderColor: theme.accent }}
                   >
                     <SelectValue placeholder="Select position" />
@@ -370,22 +274,35 @@ export const MyTeam = () => {
                 </Select>
               </div>
 
-              <div className="p-4 bg-blue-50 border-l-4 border-blue-500">
-                <p className="text-sm text-blue-800">
-                  Player stats (goals, assists, rating) will be automatically calculated from match analysis.
-                </p>
+              {/* Avatar URL */}
+              <div className="space-y-1.5">
+                <Label htmlFor="avatar" style={{ fontWeight: 700, fontSize: '0.875rem', color: '#6b7280' }}>
+                  Photo URL <span className="text-gray-400">(Optional)</span>
+                </Label>
+                <Input
+                  id="avatar"
+                  placeholder="https://example.com/photo.jpg"
+                  value={newPlayer.avatar}
+                  onChange={(e) => setNewPlayer({ ...newPlayer, avatar: e.target.value })}
+                  className="h-10 border-2"
+                  style={{ borderColor: theme.accent }}
+                />
+              </div>
+
+              <div className="p-3 bg-blue-50 border-l-3 border-blue-500 rounded text-xs text-blue-700">
+                <span style={{ fontWeight: 600 }}>ℹ️</span> Stats will be calculated from match analysis
               </div>
             </div>
 
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-3 pt-4 border-t-2" style={{ borderColor: '#e5e5e5' }}>
               <Button
                 onClick={() => setIsAddPlayerOpen(false)}
                 variant="outline"
-                className="flex-1 py-6 border-4 transition-all hover:scale-105"
+                className="flex-1 h-11 border-2 transition-all hover:scale-105"
                 style={{
-                  borderColor: theme.accent,
-                  fontWeight: 800,
-                  fontSize: '1rem',
+                  borderColor: '#d1d5db',
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
                 }}
               >
                 Cancel
@@ -393,12 +310,12 @@ export const MyTeam = () => {
               <Button
                 onClick={handleAddPlayer}
                 disabled={!newPlayer.name || !newPlayer.position || !newPlayer.number}
-                className="flex-1 py-6 text-white border-4 transition-all hover:scale-105"
+                className="flex-1 h-11 text-white border-2 transition-all hover:scale-105"
                 style={{
                   backgroundColor: theme.primary,
                   borderColor: theme.secondary,
                   fontWeight: 800,
-                  fontSize: '1rem',
+                  fontSize: '0.875rem',
                 }}
               >
                 Add Player
@@ -418,6 +335,16 @@ export const MyTeam = () => {
               }))}
             />
           </div>
+        )}
+
+        {/* Player Heatmap Modal */}
+        {selectedPlayerForHeatmap && (
+          <PlayerHeatmapModal
+            isOpen={!!selectedPlayerForHeatmap}
+            onClose={() => setSelectedPlayerForHeatmap(null)}
+            player={selectedPlayerForHeatmap}
+            teamId={teamId || ''}
+          />
         )}
       </div>
 
