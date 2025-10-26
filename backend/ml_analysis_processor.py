@@ -95,11 +95,25 @@ class MLAnalysisProcessor:
                 logger.info(f"DEBUG: Video file size: {os.path.getsize(video_path)} bytes")
 
             try:
-                video_frames = read_video(video_path)
-                logger.info(f"DEBUG: read_video returned type: {type(video_frames)}")
-                logger.info(f"DEBUG: video_frames is None: {video_frames is None}")
-                if video_frames is not None:
-                    logger.info(f"DEBUG: video_frames length: {len(video_frames)}")
+                all_frames = read_video(video_path)
+                logger.info(f"DEBUG: read_video returned type: {type(all_frames)}")
+                logger.info(f"DEBUG: all_frames is None: {all_frames is None}")
+                if all_frames is not None:
+                    logger.info(f"DEBUG: Total frames read: {len(all_frames)}")
+
+                    # For hackathon: Sample every 3rd frame to reduce memory by 66%
+                    # This allows processing of longer videos without running out of RAM
+                    video_frames = all_frames[::3]
+                    logger.info(f"🎯 Sampled {len(video_frames)} frames from {len(all_frames)} (every 3rd frame for memory efficiency)")
+
+                    # Free memory immediately
+                    del all_frames
+                    import gc
+                    gc.collect()
+                    logger.info(f"✅ Memory freed, proceeding with {len(video_frames)} frames")
+                else:
+                    video_frames = None
+
             except Exception as read_error:
                 logger.error(f"DEBUG: Exception in read_video: {type(read_error).__name__}: {str(read_error)}")
                 raise
@@ -110,7 +124,7 @@ class MLAnalysisProcessor:
                 logger.error(error_msg)
                 raise ValueError(error_msg)
 
-            logger.info(f"✅ Loaded {len(video_frames)} frames")
+            logger.info(f"✅ Processing {len(video_frames)} sampled frames")
 
             # Step 2: Initialize tracker
             logger.info("🤖 Initializing YOLO tracker...")

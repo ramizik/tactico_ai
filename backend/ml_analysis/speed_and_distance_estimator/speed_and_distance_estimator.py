@@ -6,7 +6,10 @@ from utils import measure_distance ,get_foot_position
 class SpeedAndDistance_Estimator():
     def __init__(self):
         self.frame_window=5
-        self.frame_rate=24
+        # Note: Since we're sampling every 3rd frame, effective frame rate is original/3
+        # Most videos are 30fps, so after sampling every 3rd frame we get 10fps
+        # Adjust this based on your video's original frame rate
+        self.frame_rate=10  # Was 24, now 10 for sampled frames (30fps/3)
 
     def add_speed_and_distance_to_tracks(self,tracks):
         total_distance= {}
@@ -30,6 +33,11 @@ class SpeedAndDistance_Estimator():
 
                     distance_covered = measure_distance(start_position,end_position)
                     time_elapsed = (last_frame-frame_num)/self.frame_rate
+
+                    # Avoid division by zero when last_frame equals frame_num
+                    if time_elapsed == 0:
+                        continue
+
                     speed_meteres_per_second = distance_covered/time_elapsed
                     speed_km_per_hour = speed_meteres_per_second*3.6
 
