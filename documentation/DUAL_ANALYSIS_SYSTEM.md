@@ -1,4 +1,6 @@
-# Dual Analysis System
+# Dual Analysis System (DEPRECATED)
+
+> **⚠️ DEPRECATED**: This dual analysis system has been replaced with a new single-analysis approach using an improved ML algorithm. See `ML_ANALYSIS_INTEGRATION.md` for current implementation.
 
 ## Overview
 

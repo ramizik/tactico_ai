@@ -1,5 +1,5 @@
 {
-    "name": "stealtha",
+    "name": "tactico-ai",
     "version": "1.0.0",
     "private": true,
     "workspaces": [
@@ -7,12 +7,23 @@
     ],
     "scripts": {
         "dev": "npm run dev --workspace=frontend",
+        "dev:frontend": "npm run dev --workspace=frontend",
+        "dev:backend": "cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+        "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
         "build": "npm run build --workspace=frontend",
         "preview": "npm run preview --workspace=frontend",
         "install:frontend": "npm install --workspace=frontend",
-        "install:all": "npm install"
+        "install:backend": "cd backend && pip install -r requirements.txt",
+        "install:all": "npm install && npm run install:backend",
+        "clean": "npm run clean:node_modules && npm run clean:dist",
+        "clean:node_modules": "rimraf node_modules frontend/node_modules",
+        "clean:dist": "rimraf frontend/dist",
+        "fresh-install": "npm run clean && npm install"
     },
-    "devDependencies": {},
+    "devDependencies": {
+        "rimraf": "^5.0.0",
+        "concurrently": "^8.2.0"
+    },
     "engines": {
         "node": ">=18.0.0",
         "npm": ">=8.0.0"

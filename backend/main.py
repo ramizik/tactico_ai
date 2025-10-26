@@ -5,6 +5,7 @@ FastAPI application for managing sports tactical analysis
 
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from supabase import create_client, Client
 import os
 from dotenv import load_dotenv
@@ -423,46 +424,93 @@ async def get_match_analysis(match_id: str):
 @app.get("/api/matches/{match_id}/analysis-status")
 async def get_analysis_status(match_id: str):
     """
-    Get status for both preview and full analyses
+    Get analysis status for a match
 
-    Returns combined status of preview (5 min) and full (90 min) analysis jobs
-    for real-time progress tracking in the frontend.
+    Returns status of the analysis job for real-time progress tracking in the frontend.
     """
     try:
-        # Get all jobs for this match
-        jobs = supabase.table("jobs").select("*").eq("match_id", match_id).execute()
+        # Get job for this match
+        jobs = supabase.table("jobs").select("*").eq("match_id", match_id).order("created_at", desc=True).limit(1).execute()
 
+        if not jobs.data:
+            return {
+                "status": "no_job",
+                "message": "No analysis job found for this match"
+            }
+
+        job = jobs.data[0]
         status = {
-            "preview": None,
-            "full": None
+            "job_id": job["id"],
+            "status": job["status"],
+            "progress": job["progress"],
+            "error": job.get("error_message"),
+            "updated_at": job["updated_at"],
+            "started_at": job.get("started_at"),
+            "completed_at": job.get("completed_at"),
+            "has_results": False
         }
 
-        for job in jobs.data:
-            scope = job.get("analysis_scope", "full")
-            if scope in ["preview", "full"]:
-                status[scope] = {
-                    "job_id": job["id"],
-                    "status": job["status"],
-                    "progress": job["progress"],
-                    "error": job.get("error_message"),
-                    "updated_at": job["updated_at"],
-                    "started_at": job.get("started_at"),
-                    "completed_at": job.get("completed_at")
-                }
-
-        # Get analysis results if completed
-        analyses = supabase.table("analyses").select("*").eq("match_id", match_id).execute()
-
-        for analysis in analyses.data:
-            scope = analysis.get("analysis_scope", "full")
-            if scope in ["preview", "full"] and status[scope]:
-                status[scope]["has_results"] = True
-                status[scope]["analysis_id"] = analysis["id"]
+        # Check if analysis results exist
+        analyses = supabase.table("analyses").select("id").eq("match_id", match_id).execute()
+        if analyses.data:
+            status["has_results"] = True
+            status["analysis_id"] = analyses.data[0]["id"]
 
         return status
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting analysis status: {str(e)}")
+
+
+@app.get("/api/matches/{match_id}/processed-video")
+async def get_processed_video(match_id: str):
+    """
+    Serve the processed video file for a match
+
+    Returns the ML-analyzed video with player tracking, team assignment,
+    and tactical overlays for viewing in the frontend.
+    """
+    try:
+        video_path = f"video_outputs/processed_{match_id}.mp4"
+        absolute_path = os.path.abspath(video_path)
+
+        logger.info(f"DEBUG: Request for processed video - match_id={match_id}")
+        logger.info(f"DEBUG: Looking for video at: {video_path}")
+        logger.info(f"DEBUG: Absolute path: {absolute_path}")
+        logger.info(f"DEBUG: File exists: {os.path.exists(video_path)}")
+
+        if not os.path.exists(video_path):
+            logger.error(f"DEBUG: Video file not found at {absolute_path}")
+            # List files in video_outputs directory for debugging
+            try:
+                video_outputs_dir = "video_outputs"
+                if os.path.exists(video_outputs_dir):
+                    files = os.listdir(video_outputs_dir)
+                    logger.error(f"DEBUG: Files in video_outputs: {files}")
+                else:
+                    logger.error(f"DEBUG: video_outputs directory does not exist")
+            except Exception as list_error:
+                logger.error(f"DEBUG: Error listing video_outputs: {list_error}")
+
+            raise HTTPException(status_code=404, detail="Processed video not found. Analysis may still be in progress.")
+
+        file_size = os.path.getsize(video_path)
+        logger.info(f"DEBUG: Serving video file, size: {file_size} bytes")
+
+        return FileResponse(
+            video_path,
+            media_type="video/mp4",  # MP4 with H.264 codec
+            filename=f"processed_{match_id}.mp4",
+            headers={
+                "Content-Disposition": f"inline; filename=processed_{match_id}.mp4",
+                "Cache-Control": "no-cache"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"DEBUG: Error serving video: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error serving video: {str(e)}")
 
 
 # ==================== Storage Endpoints ====================
@@ -557,10 +605,12 @@ async def upload_video_chunk(
         # Read chunk content
         chunk_content = await file.read()
 
-        # Save chunk to local storage
+        # Save chunk to local storage with proper flushing to ensure data is written to disk
         try:
             with open(chunk_path, "wb") as f:
                 f.write(chunk_content)
+                f.flush()  # Flush Python buffer
+                os.fsync(f.fileno())  # Force OS to write to disk
             print(f"Chunk saved locally: {chunk_path}")
         except Exception as storage_error:
             print(f"Local storage error: {storage_error}")
@@ -575,33 +625,7 @@ async def upload_video_chunk(
         if not update_result.data:
             raise HTTPException(status_code=404, detail="Match not found")
 
-        # Trigger preview analysis after receiving enough chunks for ~5 minutes
-        # For shorter videos, use half the chunks; for longer videos, use up to 10 chunks
-        PREVIEW_CHUNK_THRESHOLD = min(10, max(1, total_chunks // 2))  # At least 1, at most 10 chunks
-
-        # Create preview job when we reach the preview threshold
-        # Only create if video has at least 2 chunks (to ensure preview is different from full)
-        if chunk_index == PREVIEW_CHUNK_THRESHOLD - 1 and total_chunks >= 2:
-            # Check if preview job already exists
-            existing_preview = supabase.table("jobs").select("id").eq("match_id", match_id).eq("analysis_scope", "preview").execute()
-
-            if not existing_preview.data:
-                preview_job_data = {
-                    "match_id": match_id,
-                    "status": "queued",
-                    "progress": 0,
-                    "job_type": "enhanced_analysis",
-                    "analysis_scope": "preview",
-                    "video_segment_start": 0,
-                    "video_segment_end": PREVIEW_CHUNK_THRESHOLD
-                }
-                try:
-                    preview_result = supabase.table("jobs").insert(preview_job_data).execute()
-                    logger.info(f"Preview analysis job created: {preview_result.data[0]['id']} for {PREVIEW_CHUNK_THRESHOLD}/{total_chunks} chunks")
-                except Exception as job_error:
-                    logger.error(f"Failed to create preview job for match {match_id}: {job_error}")
-
-        # Check if all chunks uploaded (trigger Full Analysis)
+        # Check if all chunks uploaded
         if chunk_index == total_chunks - 1:  # Last chunk
             # Update upload status and ensure chunk counts are finalized
             # Consolidate into single update to avoid race conditions
@@ -623,28 +647,25 @@ async def upload_video_chunk(
             import time
             time.sleep(0.3)  # 300ms delay for database propagation
 
-            # Create Enhanced Analysis job (split-screen with ball tracking)
+            # Create analysis job using new ML algorithm
             # First check if a job already exists for this match to avoid duplicates
             existing_jobs = supabase.table("jobs").select("id, status").eq("match_id", match_id).eq("job_type", "enhanced_analysis").execute()
 
             if existing_jobs.data:
                 # Job already exists, log it but don't fail
                 existing_job = existing_jobs.data[0]
-                logger.info(f"Enhanced analysis job already exists: {existing_job['id']} (status: {existing_job['status']})")
+                logger.info(f"Analysis job already exists: {existing_job['id']} (status: {existing_job['status']})")
             else:
-                # Create new job for full analysis
+                # Create new job
                 job_data = {
                     "match_id": match_id,
                     "status": "queued",
                     "progress": 0,
-                    "job_type": "enhanced_analysis",  # Using new enhanced analysis
-                    "analysis_scope": "full",
-                    "video_segment_start": 0,
-                    "video_segment_end": total_chunks
+                    "job_type": "enhanced_analysis"
                 }
                 try:
                     job_result = supabase.table("jobs").insert(job_data).execute()
-                    logger.info(f"Enhanced analysis job created: {job_result.data[0]['id']}")
+                    logger.info(f"Analysis job created: {job_result.data[0]['id']}")
                 except Exception as job_error:
                     logger.error(f"Failed to create job for match {match_id}: {job_error}")
                     # Don't fail the upload, job can be created manually later

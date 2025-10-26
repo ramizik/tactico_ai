@@ -1,0 +1,100 @@
+import cv2
+import sys
+sys.path.append('../')
+from utils import measure_distance ,get_foot_position
+
+class SpeedAndDistance_Estimator():
+    def __init__(self):
+        self.frame_window=5
+        # Note: Since we're sampling every 3rd frame, effective frame rate is original/3
+        # Most videos are 30fps, so after sampling every 3rd frame we get 10fps
+        # Adjust this based on your video's original frame rate
+        self.frame_rate=10  # Was 24, now 10 for sampled frames (30fps/3)
+
+    def add_speed_and_distance_to_tracks(self,tracks):
+        total_distance= {}
+
+        for object, object_tracks in tracks.items():
+            if object == "ball" or object == "referees":
+                continue
+            number_of_frames = len(object_tracks)
+            for frame_num in range(0,number_of_frames, self.frame_window):
+                last_frame = min(frame_num+self.frame_window,number_of_frames-1 )
+
+                for track_id,_ in object_tracks[frame_num].items():
+                    if track_id not in object_tracks[last_frame]:
+                        continue
+
+                    start_position = object_tracks[frame_num][track_id]['position_transformed']
+                    end_position = object_tracks[last_frame][track_id]['position_transformed']
+
+                    if start_position is None or end_position is None:
+                        continue
+
+                    distance_covered = measure_distance(start_position,end_position)
+                    time_elapsed = (last_frame-frame_num)/self.frame_rate
+
+                    # Avoid division by zero when last_frame equals frame_num
+                    if time_elapsed == 0:
+                        continue
+
+                    speed_meteres_per_second = distance_covered/time_elapsed
+                    speed_km_per_hour = speed_meteres_per_second*3.6
+
+                    if object not in total_distance:
+                        total_distance[object]= {}
+
+                    if track_id not in total_distance[object]:
+                        total_distance[object][track_id] = 0
+
+                    total_distance[object][track_id] += distance_covered
+
+                    for frame_num_batch in range(frame_num,last_frame):
+                        if track_id not in tracks[object][frame_num_batch]:
+                            continue
+                        tracks[object][frame_num_batch][track_id]['speed'] = speed_km_per_hour
+                        tracks[object][frame_num_batch][track_id]['distance'] = total_distance[object][track_id]
+
+    def draw_speed_and_distance(self,frames,tracks):
+        output_frames = []
+        total_frames = len(frames)
+
+        for frame_num, frame in enumerate(frames):
+            # Show progress for speed and distance drawing
+            progress = ((frame_num + 1) / total_frames) * 100
+            print(f"\r    📊 Drawing speed/distance: Frame {frame_num + 1}/{total_frames} ({progress:.1f}%)", end='', flush=True)
+
+            for object, object_tracks in tracks.items():
+                if object == "ball" or object == "referees":
+                    continue
+                for _, track_info in object_tracks[frame_num].items():
+                   if "speed" in track_info:
+                       speed = track_info.get('speed',None)
+                       distance = track_info.get('distance',None)
+                       if speed is None or distance is None:
+                           continue
+
+                       bbox = track_info['bbox']
+                       position = get_foot_position(bbox)
+                       position = list(position)
+
+                       # Dynamic offset based on frame size
+                       frame_height, frame_width = frame.shape[:2]
+                       offset_y = max(20, int(frame_height * 0.03))  # 3% of frame height or 20px minimum
+                       position[1] += offset_y
+
+                       position = tuple(map(int,position))
+
+                       # Dynamic font scaling based on frame size
+                       font_scale = min(0.5, frame_width / 1920)  # Scale down for smaller videos
+                       font_thickness = max(1, int(2 * font_scale))
+
+                       # Dynamic line spacing
+                       line_spacing = max(15, int(frame_height * 0.02))  # 2% of frame height or 15px minimum
+
+                       cv2.putText(frame, f"{speed:.2f} km/h",position,cv2.FONT_HERSHEY_SIMPLEX,font_scale,(0,0,0),font_thickness)
+                       cv2.putText(frame, f"{distance:.2f} m",(position[0],position[1]+line_spacing),cv2.FONT_HERSHEY_SIMPLEX,font_scale,(0,0,0),font_thickness)
+            output_frames.append(frame)
+
+        print()  # New line after progress
+        return output_frames

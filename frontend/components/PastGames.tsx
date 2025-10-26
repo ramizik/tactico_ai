@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, Maximize2, Minimize2, Plus, Video, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import goalkeeperImage from '../assets/e182018dfac45d64e40e055e6351b8c34ba96aeb.png';
 import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,7 +7,7 @@ import { matchesApi } from '../lib/api';
 import type { Match } from '../types/api';
 import { AddMatch } from './AddMatch';
 import { AIChat } from './AIChat';
-import DualAnalysisProgress from './DualAnalysisProgress';
+import AnalysisProgress from './AnalysisProgress';
 import { SportSwitcher } from './SportSwitcher';
 
 export const PastGames = () => {
@@ -193,9 +193,8 @@ export const PastGames = () => {
                   </thead>
                   <tbody>
                     {matches.map((match) => (
-                      <>
+                      <React.Fragment key={match.id}>
                         <tr
-                          key={match.id}
                           className="border-b-2 hover:bg-gray-50 transition-colors"
                           style={{ borderColor: '#e5e5e5' }}
                         >
@@ -264,30 +263,25 @@ export const PastGames = () => {
                         {expandedMatchId === match.id && (match.status === 'processing' || match.status === 'uploading') && (
                           <tr key={`${match.id}-progress`}>
                             <td colSpan={4} className="p-6 bg-gray-50" style={{ borderColor: '#e5e5e5' }}>
-                              <DualAnalysisProgress
+                              <AnalysisProgress
                                 matchId={match.id}
-                                onPreviewComplete={() => {
-                                  // Reload matches to update status
-                                  if (teamId) {
-                                    matchesApi.getTeamMatches(teamId, 20)
-                                      .then(setMatches)
-                                      .catch(console.error);
-                                  }
-                                }}
-                                onFullComplete={() => {
+                                onComplete={() => {
                                   // Reload matches to update status and collapse
                                   if (teamId) {
                                     matchesApi.getTeamMatches(teamId, 20)
-                                      .then(setMatches)
+                                      .then(data => {
+                                        setMatches(data);
+                                        // Collapse the expanded row
+                                        setExpandedMatchId(null);
+                                      })
                                       .catch(console.error);
                                   }
-                                  setExpandedMatchId(null);
                                 }}
                               />
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>

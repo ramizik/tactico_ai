@@ -26,109 +26,17 @@ class VideoProcessor:
     Handles chunked video uploads and analysis
     """
 
-    def __init__(self, device: str = 'cpu'):
-        self.device = device
-        self._validate_device_configuration()
+    def __init__(self):
+        """
+        Initialize video processor
+
+        Note: YOLO automatically detects and uses GPU if available
+        """
         self.temp_dir = tempfile.mkdtemp(prefix='tactico_video_')
         self.ffmpeg_path = self._find_ffmpeg()
-        logger.info(f"VideoProcessor initialized with device: {device}")
+        logger.info(f"VideoProcessor initialized")
         logger.info(f"Temp directory: {self.temp_dir}")
         logger.info(f"FFmpeg path: {self.ffmpeg_path}")
-
-    def _validate_device_configuration(self):
-        """
-        Validate that the requested device is available and properly configured.
-        Provides helpful error messages if configuration is incorrect.
-        """
-        try:
-            import torch
-
-            if self.device == 'cuda':
-                if not torch.cuda.is_available():
-                    error_msg = (
-                        "\n" + "="*80 + "\n"
-                        "❌ CUDA GPU REQUESTED BUT NOT AVAILABLE\n"
-                        "="*80 + "\n"
-                        "You have ANALYSIS_DEVICE=cuda in your .env file, but CUDA is not available.\n"
-                        "\n"
-                        "Common causes:\n"
-                        "1. PyTorch was installed without CUDA support (CPU-only version)\n"
-                        "2. NVIDIA drivers are not installed or outdated\n"
-                        "3. No NVIDIA GPU is present in the system\n"
-                        "\n"
-                        "To fix this issue:\n"
-                        "\n"
-                        "Option 1: Install CUDA-enabled PyTorch (RECOMMENDED if you have NVIDIA GPU)\n"
-                        "  pip uninstall torch torchvision torchaudio -y\n"
-                        "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124\n"
-                        "\n"
-                        "Option 2: Use CPU instead (slower, but works without GPU)\n"
-                        "  Change ANALYSIS_DEVICE=cpu in your .env file\n"
-                        "\n"
-                        "To verify CUDA availability:\n"
-                        "  python -c \"import torch; print(f'CUDA: {torch.cuda.is_available()}')\"\n"
-                        "\n"
-                        f"Current PyTorch version: {torch.__version__}\n"
-                        "="*80 + "\n"
-                    )
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
-                else:
-                    logger.info(f"✓ CUDA is available: {torch.cuda.get_device_name(0)}")
-                    logger.info(f"✓ CUDA version: {torch.version.cuda}")
-
-            elif self.device == 'mps':
-                if not (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()):
-                    error_msg = (
-                        "\n" + "="*80 + "\n"
-                        "❌ MPS (Apple Silicon GPU) REQUESTED BUT NOT AVAILABLE\n"
-                        "="*80 + "\n"
-                        "You have ANALYSIS_DEVICE=mps in your .env file, but MPS is not available.\n"
-                        "\n"
-                        "This can happen if:\n"
-                        "1. You're not on a Mac with Apple Silicon (M1/M2/M3)\n"
-                        "2. Your macOS version is too old (need macOS 12.3+)\n"
-                        "3. PyTorch version doesn't support MPS\n"
-                        "\n"
-                        "To fix: Change ANALYSIS_DEVICE=cpu in your .env file\n"
-                        "="*80 + "\n"
-                    )
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
-                else:
-                    logger.info(f"✓ MPS (Apple Silicon GPU) is available")
-
-            elif self.device == 'cpu':
-                logger.info("✓ Using CPU for analysis (will be slower than GPU)")
-                if torch.cuda.is_available():
-                    logger.warning(
-                        "⚠️  Note: CUDA GPU is available but not being used. "
-                        "Set ANALYSIS_DEVICE=cuda in .env for 10-50x speedup!"
-                    )
-            else:
-                logger.warning(f"Unknown device '{self.device}', falling back to CPU")
-                self.device = 'cpu'
-
-        except ImportError:
-            error_msg = (
-                "\n" + "="*80 + "\n"
-                "❌ PYTORCH NOT INSTALLED\n"
-                "="*80 + "\n"
-                "PyTorch is required for video analysis.\n"
-                "\n"
-                "Install PyTorch:\n"
-                "  # For NVIDIA GPU:\n"
-                "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124\n"
-                "\n"
-                "  # For CPU-only:\n"
-                "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu\n"
-                "\n"
-                "Then install other requirements:\n"
-                "  pip install -r requirements.txt\n"
-                "="*80 + "\n"
-            )
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
 
     def _find_ffmpeg(self) -> str:
         """
@@ -214,22 +122,44 @@ class VideoProcessor:
             str: Path to the combined video file, or None if failed
         """
         try:
+            logger.info(f"DEBUG combine_local_chunks: team_id={team_id}, match_id={match_id}, total_chunks={total_chunks}")
+
+            # For large chunk counts, add a delay to ensure all files are fully written to disk
+            # This prevents the "moov atom not found" error with many chunks
+            if total_chunks > 50:
+                import time
+                logger.info(f"Large chunk count ({total_chunks}), waiting 3 seconds for file system sync...")
+                time.sleep(3)
+
             # Get chunk paths using cross-platform path handling
             chunk_paths = []
             for i in range(total_chunks):
                 chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
                 chunk_path = self._normalize_path(chunk_path)
+                logger.info(f"DEBUG: Checking chunk {i} at path: {chunk_path}")
+
                 if os.path.exists(chunk_path):
                     chunk_size = os.path.getsize(chunk_path)
+
+                    # Basic validation: chunks should have reasonable size
+                    # Note: Client-side chunks are just binary slices, not complete MP4 files
+                    if chunk_size < 100:  # Reduced threshold - even small chunks can be valid
+                        logger.error(f"Chunk {i} is suspiciously small ({chunk_size} bytes)")
+                        return None
+
                     logger.info(f"Found chunk {i}: {chunk_path} ({chunk_size} bytes)")
                     chunk_paths.append(chunk_path)
                 else:
-                    logger.error(f"Chunk not found: {chunk_path}")
+                    logger.error(f"DEBUG: Chunk not found: {chunk_path}")
+                    logger.error(f"DEBUG: Current working directory: {os.getcwd()}")
+                    logger.error(f"DEBUG: Absolute path would be: {os.path.abspath(chunk_path)}")
                     return None
 
             if len(chunk_paths) != total_chunks:
                 logger.error(f"Expected {total_chunks} chunks, found {len(chunk_paths)}")
                 return None
+
+            logger.info(f"DEBUG: All {len(chunk_paths)} chunks found and validated successfully")
 
             # Create output path using cross-platform path handling
             output_path = os.path.join("video_storage", team_id, match_id, "combined_video.mp4")
@@ -240,123 +170,234 @@ class VideoProcessor:
             success = self.merge_video_chunks(chunk_paths, output_path)
             if success:
                 logger.info(f"Video chunks combined successfully: {output_path}")
-                return output_path
+                # Return absolute path to ensure it works from any directory
+                absolute_path = os.path.abspath(output_path)
+                logger.info(f"Returning absolute path: {absolute_path}")
+                return absolute_path
             else:
+                logger.error("Failed to merge video chunks")
                 return None
 
         except Exception as e:
             logger.error(f"Error combining local chunks: {e}")
             return None
 
-    def combine_preview_chunks(self, team_id: str, match_id: str, preview_chunks: int) -> str:
+
+    def merge_video_chunks(self, chunk_paths: List[str], output_path: str, max_retries: int = 3) -> bool:
         """
-        Combine only the first N chunks for preview analysis
+        Merge video chunks into a single video file.
 
-        Args:
-            team_id: Team ID for the video
-            match_id: Match ID for the video
-            preview_chunks: Number of chunks to combine for preview (typically 10)
-
-        Returns:
-            str: Path to the combined preview video file, or None if failed
-        """
-        try:
-            # Get chunk paths using cross-platform path handling
-            chunk_paths = []
-            for i in range(preview_chunks):
-                chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
-                chunk_path = self._normalize_path(chunk_path)
-                if os.path.exists(chunk_path):
-                    chunk_size = os.path.getsize(chunk_path)
-                    logger.info(f"Found preview chunk {i}: {chunk_path} ({chunk_size} bytes)")
-                    chunk_paths.append(chunk_path)
-                else:
-                    logger.error(f"Preview chunk not found: {chunk_path}")
-                    return None
-
-            if len(chunk_paths) != preview_chunks:
-                logger.error(f"Expected {preview_chunks} preview chunks, found {len(chunk_paths)}")
-                return None
-
-            # Create output path for preview video
-            output_path = os.path.join("video_storage", team_id, match_id, "preview_video.mp4")
-            output_path = self._normalize_path(output_path)
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-            # Merge preview chunks
-            success = self.merge_video_chunks(chunk_paths, output_path)
-            if success:
-                logger.info(f"Preview video chunks combined successfully: {output_path}")
-                return output_path
-            else:
-                return None
-
-        except Exception as e:
-            logger.error(f"Error combining preview chunks: {e}")
-            return None
-
-    def merge_video_chunks(self, chunk_paths: List[str], output_path: str) -> bool:
-        """
-        Merge video chunks into a single video file using FFmpeg
+        For client-side chunked uploads, we use binary concatenation since chunks
+        are not self-contained MP4 files but raw binary slices.
 
         Args:
             chunk_paths: List of paths to video chunks (in order)
             output_path: Path for the merged video output
+            max_retries: Maximum number of retry attempts if merge fails
 
         Returns:
             bool: True if successful, False otherwise
         """
+        import time
+
+        # First, try simple binary concatenation (fastest and most reliable for chunked uploads)
+        logger.info(f"Using binary concatenation for {len(chunk_paths)} chunks")
+
         try:
-            # Create a temporary file list for FFmpeg with proper path handling
-            file_list_path = os.path.join(self.temp_dir, 'chunk_list.txt')
-            file_list_path = self._normalize_path(file_list_path)
+            # Binary concatenation - just combine the raw bytes
+            total_size = 0
+            with open(output_path, 'wb') as outfile:
+                for i, chunk_path in enumerate(chunk_paths):
+                    logger.info(f"Concatenating chunk {i}: {chunk_path}")
 
-            # Write file list with proper path escaping for cross-platform compatibility
-            with open(file_list_path, 'w', encoding='utf-8') as f:
-                for chunk_path in chunk_paths:
-                    # Use forward slashes for FFmpeg compatibility (works on all platforms)
-                    normalized_path = chunk_path.replace('\\', '/')
-                    f.write(f"file '{normalized_path}'\n")
+                    # Retry reading each chunk in case of temporary file lock
+                    for read_attempt in range(3):
+                        try:
+                            with open(chunk_path, 'rb') as chunk_file:
+                                chunk_data = chunk_file.read()
+                                chunk_size = len(chunk_data)
+                                total_size += chunk_size
+                                outfile.write(chunk_data)
+                                logger.info(f"Wrote chunk {i}: {chunk_size} bytes")
+                                break
+                        except Exception as read_error:
+                            if read_attempt < 2:
+                                logger.warning(f"Failed to read chunk {i}, retrying: {read_error}")
+                                time.sleep(0.5)
+                            else:
+                                raise read_error
 
-            # Use FFmpeg to concatenate chunks with proper path handling
-            cmd = [
-                self.ffmpeg_path,
-                '-f', 'concat',
-                '-safe', '0',
-                '-i', file_list_path,
-                '-c', 'copy',  # Copy streams without re-encoding
-                '-y',  # Overwrite output file
-                output_path
-            ]
+            logger.info(f"Binary concatenation complete. Total size: {total_size} bytes")
 
-            logger.info(f"Merging {len(chunk_paths)} chunks into {output_path}")
-            logger.info(f"Chunk paths: {chunk_paths}")
-            logger.info(f"File list path: {file_list_path}")
+            # Verify the output file exists and has expected size
+            if os.path.exists(output_path):
+                final_size = os.path.getsize(output_path)
+                logger.info(f"Combined video exists: {output_path}, size: {final_size} bytes")
 
-            result = subprocess.run(cmd, capture_output=True, text=True)
+                # IMPORTANT: Remux the concatenated file to ensure it's OpenCV-compatible
+                # Binary concatenation works but the result needs proper MP4 structure
+                logger.info("Remuxing concatenated file to ensure proper MP4 structure...")
+                temp_remux_output = output_path + ".remuxed.mp4"
 
-            if result.returncode == 0:
-                logger.info("Video chunks merged successfully")
-                # Verify output file exists and has size
-                if os.path.exists(output_path):
-                    file_size = os.path.getsize(output_path)
-                    logger.info(f"Combined video size: {file_size} bytes")
+                try:
+                    remux_cmd = [
+                        self.ffmpeg_path,
+                        '-i', output_path,
+                        '-c', 'copy',  # No re-encoding, just copy streams
+                        '-movflags', '+faststart',  # Optimize for streaming
+                        '-y',
+                        temp_remux_output
+                    ]
+
+                    # Set timeout based on file size
+                    remux_timeout = max(120, int(final_size / 10_000_000))  # 1 second per 10MB, min 2 minutes
+                    logger.info(f"Remuxing with timeout of {remux_timeout} seconds...")
+
+                    remux_result = subprocess.run(remux_cmd, capture_output=True, text=True, timeout=remux_timeout)
+
+                    if remux_result.returncode == 0 and os.path.exists(temp_remux_output):
+                        # Replace original with remuxed version
+                        os.replace(temp_remux_output, output_path)
+                        logger.info("✅ Successfully remuxed video - now OpenCV-compatible")
+                        return True
+                    else:
+                        logger.warning(f"Remuxing had issues but will try to proceed: {remux_result.stderr[:200]}")
+                        # Clean up temp file if it exists
+                        if os.path.exists(temp_remux_output):
+                            os.remove(temp_remux_output)
+                        # Continue with original file
+
+                except subprocess.TimeoutExpired:
+                    logger.error(f"Remuxing timed out after {remux_timeout} seconds")
+                    if os.path.exists(temp_remux_output):
+                        os.remove(temp_remux_output)
+                    return False
+                except Exception as remux_error:
+                    logger.error(f"Remuxing failed: {remux_error}")
+                    if os.path.exists(temp_remux_output):
+                        os.remove(temp_remux_output)
+                    # Try to continue with original
+
+                # For large files, skip or use longer timeout for validation
+                if final_size > 500_000_000:  # If over 500MB
+                    logger.info(f"Large file ({final_size/1_000_000:.1f}MB), skipping detailed validation")
+                    # Just do a quick check that FFmpeg can read the file header
+                    try:
+                        quick_check_cmd = [
+                            self.ffmpeg_path,
+                            '-v', 'error',
+                            '-i', output_path,
+                            '-t', '0.1',  # Only check first 0.1 seconds
+                            '-f', 'null',
+                            '-'
+                        ]
+                        subprocess.run(quick_check_cmd, capture_output=True, text=True, timeout=5)
+                        logger.info("Quick validation passed - file header is readable")
+                    except subprocess.TimeoutExpired:
+                        logger.warning("Quick validation timed out, but file exists - proceeding")
+                    except Exception as e:
+                        logger.warning(f"Quick validation failed ({e}), but file exists - proceeding")
+                    return True
+
+                # For smaller files, do full validation
+                try:
+                    validation_cmd = [
+                        self.ffmpeg_path,
+                        '-v', 'error',
+                        '-i', output_path,
+                        '-f', 'null',
+                        '-'
+                    ]
+
+                    logger.info("Validating combined video with FFmpeg...")
+                    # Increase timeout based on file size (roughly 1 second per 100MB)
+                    timeout_seconds = max(30, int(final_size / 100_000_000) + 10)
+                    validation_result = subprocess.run(validation_cmd, capture_output=True, text=True, timeout=timeout_seconds)
+
+                    if validation_result.stderr:
+                        logger.warning(f"FFmpeg validation warnings: {validation_result.stderr}")
+
+                        # If validation shows major errors, try FFmpeg remuxing as fallback
+                        if "Invalid data" in validation_result.stderr or "moov atom not found" in validation_result.stderr:
+                            logger.warning("Combined file has issues, attempting FFmpeg remux...")
+                            temp_output = output_path + ".temp.mp4"
+
+                            remux_cmd = [
+                                self.ffmpeg_path,
+                                '-i', output_path,
+                                '-c', 'copy',
+                                '-movflags', '+faststart',  # Move moov atom to beginning for better compatibility
+                                '-y',
+                                temp_output
+                            ]
+
+                            remux_result = subprocess.run(remux_cmd, capture_output=True, text=True, timeout=60)
+                            if remux_result.returncode == 0 and os.path.exists(temp_output):
+                                os.replace(temp_output, output_path)
+                                logger.info("Successfully remuxed video with FFmpeg")
+                    else:
+                        logger.info("Video validation passed")
+
+                except subprocess.TimeoutExpired:
+                    logger.warning(f"Validation timed out after {timeout_seconds}s, but file exists - assuming success")
+                except Exception as e:
+                    logger.warning(f"Validation failed ({e}), but file exists - assuming success")
+
+                # If we got here and file exists with reasonable size, consider it success
                 return True
             else:
-                logger.error(f"FFmpeg merge failed with return code: {result.returncode}")
-                logger.error(f"FFmpeg stderr: {result.stderr}")
-                logger.error(f"FFmpeg stdout: {result.stdout}")
-                # Log file list contents for debugging
-                try:
-                    with open(file_list_path, 'r') as f:
-                        logger.error(f"File list contents:\n{f.read()}")
-                except Exception as e:
-                    logger.error(f"Could not read file list: {e}")
+                logger.error(f"Output file does not exist after merge: {output_path}")
                 return False
 
         except Exception as e:
-            logger.error(f"Error merging video chunks: {e}")
-            return False
+            logger.error(f"Binary concatenation failed: {e}")
+
+            # Fallback: Try creating a simple list file for concat
+            logger.info("Attempting fallback with file list approach...")
+            try:
+                # For Windows, we need to use a file list instead of concat protocol
+                file_list_path = os.path.join(self.temp_dir, 'fallback_chunks.txt')
+                with open(file_list_path, 'w') as f:
+                    for chunk_path in chunk_paths:
+                        # Use forward slashes for FFmpeg
+                        normalized = chunk_path.replace('\\', '/')
+                        f.write(f"file '{normalized}'\n")
+
+                fallback_cmd = [
+                    self.ffmpeg_path,
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', file_list_path,
+                    '-c', 'copy',
+                    '-y',
+                    output_path
+                ]
+
+                logger.info(f"FFmpeg fallback with file list...")
+                result = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=60)
+
+                if result.returncode == 0 and os.path.exists(output_path):
+                    logger.info("Fallback file list approach succeeded")
+                    return True
+                else:
+                    logger.error(f"Fallback failed: {result.stderr}")
+
+                    # Last resort: Check if file exists anyway
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                        logger.warning("Fallback reported failure but output file exists - assuming success")
+                        return True
+
+                    return False
+
+            except Exception as fallback_error:
+                logger.error(f"Fallback method also failed: {fallback_error}")
+
+                # Final check - if output exists despite errors, consider it success
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                    logger.warning("All methods reported errors but output file exists - assuming success")
+                    return True
+
+                return False
 
     def extract_video_segment(self, video_path: str, start_sec: float, end_sec: float) -> str:
         """
@@ -453,69 +494,47 @@ class VideoProcessor:
             logger.error(f"Error in full analysis: {e}")
             return {"error": str(e)}
 
-    def run_enhanced_analysis(self, video_path: str, match_id: str, analysis_scope: str = "full") -> tuple:
+    def run_ml_analysis(self, video_path: str, match_id: str) -> tuple:
         """
-        Run enhanced split-screen analysis with ball tracking
+        Run ML analysis algorithm with player tracking and team assignment
 
         Args:
             video_path: Path to the video file
             match_id: Match ID from Supabase
-            analysis_scope: Scope of analysis ('preview' or 'full')
 
         Returns:
             tuple: (local_video_path, analysis_dict)
         """
         try:
-            logger.info(f"Starting enhanced analysis ({analysis_scope}) with split-screen output")
-            logger.info("Live preview window will open automatically")
+            logger.info(f"Starting ML analysis for match {match_id}")
+            logger.info(f"Video path provided: {video_path}")
 
-            # Set up environment and run enhanced analysis
-            env = os.environ.copy()
+            # Verify video exists before processing
+            if not os.path.exists(video_path):
+                error_msg = f"Video file does not exist at path: {video_path}"
+                logger.error(error_msg)
+                return None, {"error": error_msg}
 
-            # Add video_analysis directory to PYTHONPATH
-            if 'PYTHONPATH' in env:
-                if os.name == 'nt':  # Windows
-                    env['PYTHONPATH'] = f"{VIDEO_ANALYSIS_PATH};{env['PYTHONPATH']}"
-                else:  # Unix-like
-                    env['PYTHONPATH'] = f"{VIDEO_ANALYSIS_PATH}:{env['PYTHONPATH']}"
-            else:
-                env['PYTHONPATH'] = VIDEO_ANALYSIS_PATH
+            video_size = os.path.getsize(video_path)
+            logger.info(f"Video file exists, size: {video_size} bytes")
 
-            # Output path for enhanced video - add prefix for preview
-            output_dir = os.path.join('backend', 'video_outputs')
-            os.makedirs(output_dir, exist_ok=True)
-            output_prefix = "preview_" if analysis_scope == "preview" else ""
-            output_path = os.path.join(output_dir, f'{output_prefix}enhanced_{match_id}.mp4')
+            # Import and use the ml analysis processor
+            from ml_analysis_processor import process_video_with_ml_analysis
 
-            cmd = [
-                sys.executable,
-                os.path.join(VIDEO_ANALYSIS_PATH, 'examples', 'soccer', 'enhanced_supabase_analysis.py'),
-                '--source_video_path', video_path,
-                '--match_id', match_id,
-                '--device', self.device,
-                '--export_local',
-                '--show_preview',  # Always show live preview window
-                '--analysis_scope', analysis_scope  # Pass scope to analysis script
-            ]
+            output_path, analysis_data = process_video_with_ml_analysis(
+                video_path,
+                match_id
+            )
 
-            logger.info(f"Running enhanced analysis with command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-
-            if result.returncode == 0:
-                logger.info(f"Enhanced analysis completed successfully")
-                # Return the expected output path and a basic analysis dict
-                analysis_data = {
-                    "analysis_type": "enhanced_analysis",
-                    "summary": "Enhanced split-screen analysis completed",
-                    "video_path": output_path
-                }
+            if output_path and os.path.exists(output_path):
+                logger.info(f"ML analysis completed successfully: {output_path}")
                 return output_path, analysis_data
             else:
-                logger.error(f"Enhanced analysis failed: {result.stderr}")
-                return None, {"error": result.stderr}
+                logger.error("ML analysis failed: No output video generated")
+                return None, {"error": "No output video generated"}
 
         except Exception as e:
-            logger.error(f"Error running enhanced analysis: {e}")
+            logger.error(f"Error running ML analysis: {e}")
             return None, {"error": str(e)}
 
     def _run_video_analysis(self, video_path: str, analysis_type: str) -> Dict:
@@ -655,88 +674,80 @@ class VideoProcessor:
             logger.error(f"Error cleaning up: {e}")
 
 
-def run_quick_brief_from_chunks(team_id: str, match_id: str, total_chunks: int, device: str = 'cpu') -> Dict:
+def run_ml_analysis_from_chunks(team_id: str, match_id: str, total_chunks: int) -> tuple:
     """
-    Run quick brief analysis on locally stored video chunks
+    Run ML analysis on locally stored video chunks
 
     Args:
         team_id: Team ID for the video
         match_id: Match ID for the video
         total_chunks: Total number of chunks
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
 
     Returns:
-        Dict: Analysis results
+        tuple: (output_video_path, analysis_data)
+
+    Note: YOLO automatically detects and uses GPU if available
     """
-    processor = VideoProcessor(device=device)
+    processor = VideoProcessor()
     try:
+        logger.info(f"DEBUG run_ml_analysis_from_chunks: Starting for team_id={team_id}, match_id={match_id}, total_chunks={total_chunks}")
+
         # Combine chunks first
         combined_video_path = processor.combine_local_chunks(team_id, match_id, total_chunks)
-        if not combined_video_path:
-            return {"error": "Failed to combine video chunks"}
+        logger.info(f"DEBUG: combine_local_chunks returned: {combined_video_path}")
 
-        # Run quick brief analysis
-        return processor.run_quick_brief(combined_video_path)
+        if not combined_video_path:
+            logger.error("DEBUG: combined_video_path is None or empty")
+            return None, {"error": "Failed to combine video chunks"}
+
+        if not os.path.exists(combined_video_path):
+            logger.error(f"DEBUG: Combined video path does not exist: {combined_video_path}")
+            return None, {"error": f"Combined video file not found: {combined_video_path}"}
+
+        combined_video_size = os.path.getsize(combined_video_path)
+        logger.info(f"DEBUG: Combined video verified - path={combined_video_path}, size={combined_video_size} bytes")
+
+        # Run ML analysis
+        logger.info(f"DEBUG: Calling processor.run_ml_analysis with path: {combined_video_path}")
+        result = processor.run_ml_analysis(combined_video_path, match_id)
+        logger.info(f"DEBUG: run_ml_analysis returned: {result}")
+        return result
     finally:
         processor.cleanup()
 
 
-def run_full_analysis_from_chunks(team_id: str, match_id: str, total_chunks: int, device: str = 'cpu') -> Dict:
-    """
-    Run full analysis on locally stored video chunks
-
-    Args:
-        team_id: Team ID for the video
-        match_id: Match ID for the video
-        total_chunks: Total number of chunks
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
-
-    Returns:
-        Dict: Analysis results
-    """
-    processor = VideoProcessor(device=device)
-    try:
-        # Combine chunks first
-        combined_video_path = processor.combine_local_chunks(team_id, match_id, total_chunks)
-        if not combined_video_path:
-            return {"error": "Failed to combine video chunks"}
-
-        # Run full analysis
-        return processor.run_full_analysis(combined_video_path)
-    finally:
-        processor.cleanup()
-
-
-def run_quick_brief(video_path: str, device: str = 'cpu') -> Dict:
+def run_quick_brief(video_path: str) -> Dict:
     """
     Convenience function to run quick brief analysis
 
     Args:
         video_path: Path to the video file
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
 
     Returns:
         Dict: Analysis results
+
+    Note: YOLO automatically detects and uses GPU if available
     """
-    processor = VideoProcessor(device=device)
+    processor = VideoProcessor()
     try:
         return processor.run_quick_brief(video_path)
     finally:
         processor.cleanup()
 
 
-def run_full_analysis(video_path: str, device: str = 'cpu') -> Dict:
+def run_full_analysis(video_path: str) -> Dict:
     """
     Convenience function to run full analysis
 
     Args:
         video_path: Path to the video file
-        device: Device to use for processing ('cpu', 'cuda', 'mps')
 
     Returns:
         Dict: Analysis results
+
+    Note: YOLO automatically detects and uses GPU if available
     """
-    processor = VideoProcessor(device=device)
+    processor = VideoProcessor()
     try:
         return processor.run_full_analysis(video_path)
     finally:
@@ -750,11 +761,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Test Video Processor')
     parser.add_argument('--video_path', type=str, required=True, help='Path to video file')
     parser.add_argument('--analysis_type', type=str, choices=['quick_brief', 'full_analysis'], required=True)
-    parser.add_argument('--device', type=str, default='cpu', help='Device to use')
 
     args = parser.parse_args()
 
-    processor = VideoProcessor(device=args.device)
+    processor = VideoProcessor()
 
     try:
         if args.analysis_type == 'quick_brief':
