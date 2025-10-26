@@ -112,8 +112,8 @@ Stores match analysis summary:
 ## Output Files
 
 ### Video Output
-- **Path**: `video_outputs/processed_{match_id}.avi`
-- **Format**: AVI (XVID codec)
+- **Path**: `video_outputs/processed_{match_id}.mp4`
+- **Format**: MP4 (H.264 codec)
 - **Content**: Annotated video with:
   - Player tracking ellipses
   - Team color coding

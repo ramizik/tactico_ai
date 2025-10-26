@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, Maximize2, Minimize2, Plus, Video, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import goalkeeperImage from '../assets/e182018dfac45d64e40e055e6351b8c34ba96aeb.png';
 import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -193,9 +193,8 @@ export const PastGames = () => {
                   </thead>
                   <tbody>
                     {matches.map((match) => (
-                      <>
+                      <React.Fragment key={match.id}>
                         <tr
-                          key={match.id}
                           className="border-b-2 hover:bg-gray-50 transition-colors"
                           style={{ borderColor: '#e5e5e5' }}
                         >
@@ -282,7 +281,7 @@ export const PastGames = () => {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>

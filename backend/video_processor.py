@@ -122,22 +122,30 @@ class VideoProcessor:
             str: Path to the combined video file, or None if failed
         """
         try:
+            logger.info(f"DEBUG combine_local_chunks: team_id={team_id}, match_id={match_id}, total_chunks={total_chunks}")
+
             # Get chunk paths using cross-platform path handling
             chunk_paths = []
             for i in range(total_chunks):
                 chunk_path = os.path.join("video_storage", team_id, match_id, "chunks", f"chunk_{i:03d}.mp4")
                 chunk_path = self._normalize_path(chunk_path)
+                logger.info(f"DEBUG: Checking chunk {i} at path: {chunk_path}")
+
                 if os.path.exists(chunk_path):
                     chunk_size = os.path.getsize(chunk_path)
                     logger.info(f"Found chunk {i}: {chunk_path} ({chunk_size} bytes)")
                     chunk_paths.append(chunk_path)
                 else:
-                    logger.error(f"Chunk not found: {chunk_path}")
+                    logger.error(f"DEBUG: Chunk not found: {chunk_path}")
+                    logger.error(f"DEBUG: Current working directory: {os.getcwd()}")
+                    logger.error(f"DEBUG: Absolute path would be: {os.path.abspath(chunk_path)}")
                     return None
 
             if len(chunk_paths) != total_chunks:
                 logger.error(f"Expected {total_chunks} chunks, found {len(chunk_paths)}")
                 return None
+
+            logger.info(f"DEBUG: All {len(chunk_paths)} chunks found successfully")
 
             # Create output path using cross-platform path handling
             output_path = os.path.join("video_storage", team_id, match_id, "combined_video.mp4")
@@ -195,23 +203,29 @@ class VideoProcessor:
                 output_path
             ]
 
-            logger.info(f"Merging {len(chunk_paths)} chunks into {output_path}")
-            logger.info(f"Chunk paths: {chunk_paths}")
-            logger.info(f"File list path: {file_list_path}")
+            logger.info(f"DEBUG: Merging {len(chunk_paths)} chunks into {output_path}")
+            logger.info(f"DEBUG: Chunk paths: {chunk_paths}")
+            logger.info(f"DEBUG: File list path: {file_list_path}")
+            logger.info(f"DEBUG: FFmpeg command: {' '.join(cmd)}")
 
             result = subprocess.run(cmd, capture_output=True, text=True)
 
+            logger.info(f"DEBUG: FFmpeg return code: {result.returncode}")
+
             if result.returncode == 0:
-                logger.info("Video chunks merged successfully")
+                logger.info("DEBUG: Video chunks merged successfully")
                 # Verify output file exists and has size
                 if os.path.exists(output_path):
                     file_size = os.path.getsize(output_path)
-                    logger.info(f"Combined video size: {file_size} bytes")
-                return True
+                    logger.info(f"DEBUG: Combined video exists, size: {file_size} bytes")
+                    return True
+                else:
+                    logger.error(f"DEBUG: Output file does not exist after merge: {output_path}")
+                    return False
             else:
-                logger.error(f"FFmpeg merge failed with return code: {result.returncode}")
-                logger.error(f"FFmpeg stderr: {result.stderr}")
-                logger.error(f"FFmpeg stdout: {result.stdout}")
+                logger.error(f"DEBUG: FFmpeg merge failed with return code: {result.returncode}")
+                logger.error(f"DEBUG: FFmpeg stderr: {result.stderr}")
+                logger.error(f"DEBUG: FFmpeg stdout: {result.stdout}")
                 # Log file list contents for debugging
                 try:
                     with open(file_list_path, 'r') as f:
@@ -515,13 +529,28 @@ def run_ml_analysis_from_chunks(team_id: str, match_id: str, total_chunks: int) 
     """
     processor = VideoProcessor()
     try:
+        logger.info(f"DEBUG run_ml_analysis_from_chunks: Starting for team_id={team_id}, match_id={match_id}, total_chunks={total_chunks}")
+
         # Combine chunks first
         combined_video_path = processor.combine_local_chunks(team_id, match_id, total_chunks)
+        logger.info(f"DEBUG: combine_local_chunks returned: {combined_video_path}")
+
         if not combined_video_path:
+            logger.error("DEBUG: combined_video_path is None or empty")
             return None, {"error": "Failed to combine video chunks"}
 
+        if not os.path.exists(combined_video_path):
+            logger.error(f"DEBUG: Combined video path does not exist: {combined_video_path}")
+            return None, {"error": f"Combined video file not found: {combined_video_path}"}
+
+        combined_video_size = os.path.getsize(combined_video_path)
+        logger.info(f"DEBUG: Combined video verified - path={combined_video_path}, size={combined_video_size} bytes")
+
         # Run ML analysis
-        return processor.run_ml_analysis(combined_video_path, match_id)
+        logger.info(f"DEBUG: Calling processor.run_ml_analysis with path: {combined_video_path}")
+        result = processor.run_ml_analysis(combined_video_path, match_id)
+        logger.info(f"DEBUG: run_ml_analysis returned: {result}")
+        return result
     finally:
         processor.cleanup()
 

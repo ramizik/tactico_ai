@@ -468,11 +468,11 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
                       >
                         <source
                           src={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/matches/${matchId}/processed-video`}
-                          type="video/x-msvideo"
+                          type="video/mp4"
                         />
                         <source
                           src={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/matches/${matchId}/processed-video`}
-                          type="video/mp4"
+                          type="video/webm"
                         />
                         Your browser does not support the video tag.
                       </video>

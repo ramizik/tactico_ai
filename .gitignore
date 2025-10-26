@@ -274,14 +274,3 @@ backend/tmp/
 # Database dumps
 *.sql.backup
 *.db.backup
-
-# Video files (for development - remove in production)
-*.mp4
-*.mov
-*.avi
-*.mkv
-*.webm
-
-# Analysis output files
-analysis_output/
-video_analysis_output/

@@ -471,19 +471,45 @@ async def get_processed_video(match_id: str):
     and tactical overlays for viewing in the frontend.
     """
     try:
-        video_path = f"video_outputs/processed_{match_id}.avi"
+        video_path = f"video_outputs/processed_{match_id}.mp4"
+        absolute_path = os.path.abspath(video_path)
+
+        logger.info(f"DEBUG: Request for processed video - match_id={match_id}")
+        logger.info(f"DEBUG: Looking for video at: {video_path}")
+        logger.info(f"DEBUG: Absolute path: {absolute_path}")
+        logger.info(f"DEBUG: File exists: {os.path.exists(video_path)}")
 
         if not os.path.exists(video_path):
+            logger.error(f"DEBUG: Video file not found at {absolute_path}")
+            # List files in video_outputs directory for debugging
+            try:
+                video_outputs_dir = "video_outputs"
+                if os.path.exists(video_outputs_dir):
+                    files = os.listdir(video_outputs_dir)
+                    logger.error(f"DEBUG: Files in video_outputs: {files}")
+                else:
+                    logger.error(f"DEBUG: video_outputs directory does not exist")
+            except Exception as list_error:
+                logger.error(f"DEBUG: Error listing video_outputs: {list_error}")
+
             raise HTTPException(status_code=404, detail="Processed video not found. Analysis may still be in progress.")
+
+        file_size = os.path.getsize(video_path)
+        logger.info(f"DEBUG: Serving video file, size: {file_size} bytes")
 
         return FileResponse(
             video_path,
-            media_type="video/x-msvideo",
-            filename=f"processed_{match_id}.avi"
+            media_type="video/mp4",  # MP4 with H.264 codec
+            filename=f"processed_{match_id}.mp4",
+            headers={
+                "Content-Disposition": f"inline; filename=processed_{match_id}.mp4",
+                "Cache-Control": "no-cache"
+            }
         )
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"DEBUG: Error serving video: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error serving video: {str(e)}")
 
 

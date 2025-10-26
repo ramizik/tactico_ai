@@ -89,7 +89,20 @@ class MLAnalysisProcessor:
 
             # Step 1: Read video
             logger.info("📹 Reading video file...")
-            video_frames = read_video(video_path)
+            logger.info(f"DEBUG: About to call read_video with path: {video_path}")
+            logger.info(f"DEBUG: Video file exists: {os.path.exists(video_path)}")
+            if os.path.exists(video_path):
+                logger.info(f"DEBUG: Video file size: {os.path.getsize(video_path)} bytes")
+
+            try:
+                video_frames = read_video(video_path)
+                logger.info(f"DEBUG: read_video returned type: {type(video_frames)}")
+                logger.info(f"DEBUG: video_frames is None: {video_frames is None}")
+                if video_frames is not None:
+                    logger.info(f"DEBUG: video_frames length: {len(video_frames)}")
+            except Exception as read_error:
+                logger.error(f"DEBUG: Exception in read_video: {type(read_error).__name__}: {str(read_error)}")
+                raise
 
             # Check if video was read successfully
             if video_frames is None or len(video_frames) == 0:
@@ -187,7 +200,7 @@ class MLAnalysisProcessor:
             # Step 12: Save output video
             output_dir = os.path.join('video_outputs')
             os.makedirs(output_dir, exist_ok=True)
-            output_path = os.path.join(output_dir, f'processed_{match_id}.avi')
+            output_path = os.path.join(output_dir, f'processed_{match_id}.mp4')
 
             logger.info("💾 Saving output video...")
             save_video(output_video_frames, output_path)
@@ -221,6 +234,11 @@ class MLAnalysisProcessor:
             team_ball_control: Ball control array
         """
         try:
+            logger.info(f"DEBUG: Starting to save tracking data for match {match_id}")
+            logger.info(f"DEBUG: tracks keys: {list(tracks.keys())}")
+            logger.info(f"DEBUG: tracks['players'] length: {len(tracks.get('players', []))}")
+            logger.info(f"DEBUG: tracks['ball'] length: {len(tracks.get('ball', []))}")
+
             batch_size = 100
             positions_batch = []
 
@@ -234,6 +252,10 @@ class MLAnalysisProcessor:
                         continue
 
                     position = player_data['position']
+                    if position is None or len(position) < 2:
+                        logger.warning(f"DEBUG: Invalid position data for player {player_id} frame {frame_num}: {position}")
+                        continue
+
                     transformed_position = player_data.get('position_transformed', position)
 
                     position_record = {
@@ -245,8 +267,8 @@ class MLAnalysisProcessor:
                         'team_id': int(player_data.get('team', 0)),
                         'x': float(position[0]),
                         'y': float(position[1]),
-                        'x_transformed': float(transformed_position[0]) if len(transformed_position) > 0 else None,
-                        'y_transformed': float(transformed_position[1]) if len(transformed_position) > 1 else None,
+                        'x_transformed': float(transformed_position[0]) if transformed_position and len(transformed_position) > 0 else None,
+                        'y_transformed': float(transformed_position[1]) if transformed_position and len(transformed_position) > 1 else None,
                         'speed': float(player_data.get('speed', 0.0)),
                         'distance': float(player_data.get('distance', 0.0)),
                         'has_ball': player_data.get('has_ball', False)
@@ -258,6 +280,10 @@ class MLAnalysisProcessor:
                     ball_data = tracks['ball'][frame_num][1]
                     if 'position' in ball_data:
                         position = ball_data['position']
+                        if position is None or len(position) < 2:
+                            logger.warning(f"DEBUG: Invalid ball position data for frame {frame_num}: {position}")
+                            continue
+
                         transformed_position = ball_data.get('position_transformed', position)
 
                         ball_record = {
@@ -269,8 +295,8 @@ class MLAnalysisProcessor:
                             'team_id': None,
                             'x': float(position[0]),
                             'y': float(position[1]),
-                            'x_transformed': float(transformed_position[0]) if len(transformed_position) > 0 else None,
-                            'y_transformed': float(transformed_position[1]) if len(transformed_position) > 1 else None,
+                            'x_transformed': float(transformed_position[0]) if transformed_position and len(transformed_position) > 0 else None,
+                            'y_transformed': float(transformed_position[1]) if transformed_position and len(transformed_position) > 1 else None,
                             'speed': None,
                             'distance': None,
                             'has_ball': False

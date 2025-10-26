@@ -224,17 +224,22 @@ class JobProcessor:
                     )
 
             logger.info(f"Starting ML analysis for match {match_id} with {total_chunks} chunks")
+            logger.info(f"DEBUG: team_id={team_id}, match_id={match_id}, total_chunks={total_chunks}")
 
             # Update progress
             self._update_job_status(job_id, "running", 10)
 
             # Run ML analysis from chunks
+            logger.info(f"DEBUG: Calling run_ml_analysis_from_chunks...")
             video_path, analysis_results = run_ml_analysis_from_chunks(
                 team_id, match_id, total_chunks
             )
+            logger.info(f"DEBUG: run_ml_analysis_from_chunks returned - video_path={video_path}, analysis_results keys={list(analysis_results.keys()) if analysis_results else None}")
 
             if video_path is None or "error" in analysis_results:
-                raise Exception(f"ML analysis failed: {analysis_results.get('error', 'Unknown error')}")
+                error_detail = analysis_results.get('error', 'Unknown error') if analysis_results else 'No analysis results returned'
+                logger.error(f"DEBUG: ML analysis failed - video_path is None: {video_path is None}, error in results: {'error' in analysis_results if analysis_results else 'N/A'}")
+                raise Exception(f"ML analysis failed: {error_detail}")
 
             # Update progress
             self._update_job_status(job_id, "running", 95)
