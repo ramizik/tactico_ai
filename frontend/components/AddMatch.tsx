@@ -22,7 +22,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useChunkedUpload } from '../hooks/useChunkedUpload';
 import { useJobPolling } from '../hooks/useJobPolling';
 import { matchesApi } from '../lib/api';
-import DualAnalysisProgress from './DualAnalysisProgress';
+import AnalysisProgress from './AnalysisProgress';
 import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
 import { Input } from './ui/input';
@@ -110,9 +110,9 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
     }
   };
 
-  // Step 3: Monitor job progress - handled by DualAnalysisProgress component
-  // When full analysis completes, move to step 4
-  const handleFullAnalysisComplete = () => {
+  // Step 3: Monitor job progress - handled by AnalysisProgress component
+  // When analysis completes, move to step 4
+  const handleAnalysisComplete = () => {
     if (currentStep === 3) {
       setTimeout(() => {
         setCurrentStep(4);
@@ -405,16 +405,13 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
               Analysis in Progress
             </h2>
             <p className="mb-8" style={{ color: '#6b7280' }}>
-              Our AI is performing enhanced video analysis. You'll get quick insights from the first 5 minutes in 1-2 minutes, while the full analysis continues in the background.
+              Our AI is performing comprehensive video analysis with player tracking, team assignment, and tactical insights.
             </p>
 
             {matchId && (
-              <DualAnalysisProgress
+              <AnalysisProgress
                 matchId={matchId}
-                onPreviewComplete={() => {
-                  console.log('Preview analysis completed!');
-                }}
-                onFullComplete={handleFullAnalysisComplete}
+                onComplete={handleAnalysisComplete}
               />
             )}
 
@@ -428,61 +425,115 @@ export const AddMatch = ({ onBack, onComplete, backButtonText = 'Back to Dashboa
         )}
 
         {currentStep === 4 && (
-          <div className="bg-white border-4 p-12 text-center" style={{ borderColor: theme.accent }}>
-            <div
-              className="w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center"
-              style={{ backgroundColor: successColor }}
-            >
-              <Check className="w-12 h-12 text-white" />
-            </div>
+          <div className="bg-white border-4 p-8" style={{ borderColor: theme.accent }}>
+            <div className="max-w-6xl mx-auto">
+              {/* Success Header */}
+              <div className="text-center mb-8">
+                <div
+                  className="w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center"
+                  style={{ backgroundColor: successColor }}
+                >
+                  <Check className="w-12 h-12 text-white" />
+                </div>
 
-            <h2
-              className="mb-4"
-              style={{
-                fontSize: '2rem',
-                fontWeight: 900,
-                color: theme.secondary,
-              }}
-            >
-              Analysis Complete
-            </h2>
+                <h2
+                  className="mb-4"
+                  style={{
+                    fontSize: '2rem',
+                    fontWeight: 900,
+                    color: theme.secondary,
+                  }}
+                >
+                  Analysis Complete
+                </h2>
 
-            <p className="mb-8" style={{ fontSize: '1.125rem', color: '#ffffff' }}>
-              Your match has been successfully analyzed.
-            </p>
+                <p className="mb-4" style={{ fontSize: '1.125rem', color: theme.secondary }}>
+                  Your match has been successfully analyzed with AI-powered player tracking.
+                </p>
+              </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                onClick={onComplete}
-                className="px-8 py-6 text-white border-4 transition-all hover:scale-105"
-                style={{
-                  backgroundColor: theme.primary,
-                  borderColor: theme.secondary,
-                  fontWeight: 800,
-                  fontSize: '1.125rem',
-                }}
-              >
-                View Results
-              </Button>
-              <Button
-                onClick={() => {
-                  setCurrentStep(1);
-                  setMatchDetails({ opponent: '', date: null });
-                  setMatchId(null);
-                  setSelectedFile(null);
-                  setError(null);
-                  resetUpload();
-                }}
-                variant="outline"
-                className="px-8 py-6 border-4 transition-all hover:scale-105"
-                style={{
-                  borderColor: theme.accent,
-                  fontWeight: 800,
-                  fontSize: '1.125rem',
-                }}
-              >
-                Add Another Match
-              </Button>
+              {/* Video Player Section */}
+              {matchId && (
+                <div className="mb-8">
+                  <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                    <h3 className="text-xl font-bold mb-4" style={{ color: theme.secondary }}>
+                      Processed Match Video
+                    </h3>
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
+                      <video
+                        controls
+                        className="w-full h-full"
+                        preload="metadata"
+                        style={{ maxHeight: '600px' }}
+                      >
+                        <source
+                          src={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/matches/${matchId}/processed-video`}
+                          type="video/x-msvideo"
+                        />
+                        <source
+                          src={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/matches/${matchId}/processed-video`}
+                          type="video/mp4"
+                        />
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  </div>
+
+                  {/* Analysis Features Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className="text-center p-4 rounded-lg" style={{ backgroundColor: `${theme.primary}15` }}>
+                      <div className="text-2xl mb-2">🎯</div>
+                      <h4 className="font-bold mb-1" style={{ color: theme.primary }}>Player Tracking</h4>
+                      <p className="text-sm" style={{ color: theme.secondary }}>Real-time position tracking</p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg" style={{ backgroundColor: `${theme.primary}15` }}>
+                      <div className="text-2xl mb-2">👥</div>
+                      <h4 className="font-bold mb-1" style={{ color: theme.primary }}>Team Assignment</h4>
+                      <p className="text-sm" style={{ color: theme.secondary }}>Automatic team detection</p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg" style={{ backgroundColor: `${theme.primary}15` }}>
+                      <div className="text-2xl mb-2">⚽</div>
+                      <h4 className="font-bold mb-1" style={{ color: theme.primary }}>Ball Possession</h4>
+                      <p className="text-sm" style={{ color: theme.secondary }}>Ownership tracking</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  onClick={onComplete}
+                  className="px-8 py-6 text-white border-4 transition-all hover:scale-105"
+                  style={{
+                    backgroundColor: theme.primary,
+                    borderColor: theme.secondary,
+                    fontWeight: 800,
+                    fontSize: '1.125rem',
+                  }}
+                >
+                  Back to Dashboard
+                </Button>
+                <Button
+                  onClick={() => {
+                    setCurrentStep(1);
+                    setMatchDetails({ opponent: '', date: null });
+                    setMatchId(null);
+                    setSelectedFile(null);
+                    setError(null);
+                    resetUpload();
+                  }}
+                  variant="outline"
+                  className="px-8 py-6 border-4 transition-all hover:scale-105"
+                  style={{
+                    borderColor: theme.accent,
+                    fontWeight: 800,
+                    fontSize: '1.125rem',
+                  }}
+                >
+                  Analyze Another Match
+                </Button>
+              </div>
             </div>
           </div>
         )}

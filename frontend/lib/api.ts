@@ -96,26 +96,10 @@ export const matchesApi = {
         return data.analysis;
     },
 
-    getJob: async (matchId: string) => {
-        const res = await fetch(`${API_BASE_URL}/api/matches/${matchId}/job`);
-        if (!res.ok) {
-            if (res.status === 404) return null; // No job exists yet
-            throw new Error('Failed to fetch job');
-        }
-        const data = await res.json();
-        // Backend returns job data directly, not wrapped in {job: ...}
-        // Map backend response to Job type
-        return {
-            id: data.job_id,
-            match_id: data.match_id,
-            job_type: 'enhanced_analysis' as const,
-            status: data.status,
-            progress: data.progress,
-            error_message: data.error,
-            retry_count: 0,
-            updated_at: data.updated_at,
-            created_at: data.updated_at
-        };
+    getAnalysisStatus: async (matchId: string) => {
+        const res = await fetch(`${API_BASE_URL}/api/matches/${matchId}/analysis-status`);
+        if (!res.ok) throw new Error('Failed to fetch analysis status');
+        return await res.json();
     }
 };
 
