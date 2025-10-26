@@ -4,7 +4,9 @@ import { useSession } from '../contexts/SessionContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { playersApi } from '../lib/api';
 import type { Player as ApiPlayer } from '../types/api';
+import { SoccerFieldHeatmap } from './SoccerFieldHeatmap';
 import { SportSwitcher } from './SportSwitcher';
+import { TeamLineup } from './TeamLineup';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
@@ -42,6 +44,23 @@ export const MyTeam = () => {
 
     loadPlayers();
   }, [teamId]);
+
+  // Transform API Player to component-compatible format for visualization
+  const adaptPlayerForVisualization = (apiPlayer: ApiPlayer) => ({
+    id: parseInt(apiPlayer.id) || 0,
+    name: apiPlayer.name,
+    position: apiPlayer.position,
+    number: apiPlayer.jersey_number,
+    avatar: apiPlayer.avatar_url || 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=150',
+    stats: {
+      goals: apiPlayer.stats.goals,
+      assists: apiPlayer.stats.assists,
+      rating: apiPlayer.stats.rating
+    }
+  });
+
+  // Adapted players for visualization components
+  const visualizationPlayers = players.map(adaptPlayerForVisualization);
 
   const handleAddPlayer = async () => {
     if (!newPlayer.name || !newPlayer.position || !newPlayer.number || !teamId) {
@@ -148,6 +167,11 @@ export const MyTeam = () => {
             </div>
           </div>
         </div>
+
+        {/* Team of the Season Lineup */}
+        {!isLoading && players.length > 0 && (
+          <TeamLineup players={visualizationPlayers} />
+        )}
 
         {/* Header Section */}
         <div className="flex justify-between items-center mb-6">
@@ -382,6 +406,19 @@ export const MyTeam = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Soccer Field Heatmap Section */}
+        {!isLoading && players.length > 0 && (
+          <div className="mb-12">
+            <SoccerFieldHeatmap
+              players={visualizationPlayers.map(p => ({
+                id: p.id,
+                name: p.name,
+                number: p.number
+              }))}
+            />
+          </div>
+        )}
       </div>
 
       <SportSwitcher />
