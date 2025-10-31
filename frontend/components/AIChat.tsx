@@ -105,12 +105,12 @@ export const AIChat = ({ onClose, matchInfo }: AIChatProps) => {
     <div
       className="fixed shadow-2xl z-50 flex flex-col"
       style={{
-        bottom: '112px',
+        bottom: '32px',
         right: '32px',
         width: isMinimized ? '360px' : '400px',
         height: isMinimized ? 'auto' : '520px',
         maxWidth: 'calc(100vw - 64px)',
-        maxHeight: 'calc(100vh - 160px)',
+        maxHeight: 'calc(100vh - 120px)',
         background: 'linear-gradient(to bottom, #000000, #1a3311, #477023)',
         borderRadius: '12px',
         overflow: 'hidden',

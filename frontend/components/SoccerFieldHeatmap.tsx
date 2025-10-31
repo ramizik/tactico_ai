@@ -180,9 +180,6 @@ export const SoccerFieldHeatmap = ({ players }: SoccerFieldHeatmapProps) => {
                 >
                     Player Activity Heatmap
                 </h2>
-                <p className="text-gray-600">
-                    Select a player and match to view their activity zones on the field
-                </p>
             </div>
 
             {/* Controls */}
@@ -458,16 +455,6 @@ export const SoccerFieldHeatmap = ({ players }: SoccerFieldHeatmapProps) => {
                         </div>
                     </div>
                 )}
-            </div>
-
-            {/* Info Text */}
-            <div
-                className="bg-white border-4 p-4"
-                style={{ borderColor: theme.accent }}
-            >
-                <p className="text-sm text-gray-700">
-                    <span style={{ fontWeight: 700 }}>How to read the heatmap:</span> Red zones indicate high activity areas where the player spent most time during the match. Yellow zones show moderate activity, and green zones represent areas of lower engagement. This visualization helps identify player positioning patterns and tactical movement.
-                </p>
             </div>
         </div>
     );

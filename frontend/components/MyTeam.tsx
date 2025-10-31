@@ -1,4 +1,3 @@
-import { Award, TrendingUp, UserPlus } from 'lucide-react';
 import { PlayerHeatmapModal } from './PlayerHeatmapModal';
 import { useEffect, useState } from 'react';
 import { useSession } from '../contexts/SessionContext';
@@ -131,58 +130,10 @@ export const MyTeam = () => {
           {getUniversityName()}
         </h1>
 
-        {/* Team Stats Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div
-            className="bg-white border-4 p-6"
-            style={{ borderColor: theme.accent }}
-          >
-            <div className="flex items-center gap-4">
-              <Award className="w-12 h-12" style={{ color: theme.primary }} />
-              <div>
-                <div style={{ fontSize: '2rem', fontWeight: 900, color: theme.primary }}>
-                  1st
-                </div>
-                <div className="text-gray-600">League Position</div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="bg-white border-4 p-6"
-            style={{ borderColor: theme.accent }}
-          >
-            <div className="flex items-center gap-4">
-              <TrendingUp className="w-12 h-12" style={{ color: theme.accent }} />
-              <div>
-                <div style={{ fontSize: '2rem', fontWeight: 900, color: theme.primary }}>
-                  8.3
-                </div>
-                <div className="text-gray-600">Avg Team Rating</div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="bg-white border-4 p-6"
-            style={{ borderColor: theme.accent }}
-          >
-            <div className="flex items-center gap-4">
-              <UserPlus className="w-12 h-12" style={{ color: theme.secondary }} />
-              <div>
-                <div style={{ fontSize: '2rem', fontWeight: 900, color: theme.primary }}>
-                  {players.length}
-                </div>
-                <div className="text-gray-600">Active Players</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Team of the Season Lineup */}
         {!isLoading && players.length > 0 && (
-          <TeamLineup 
-            players={visualizationPlayers} 
+          <TeamLineup
+            players={visualizationPlayers}
             onPlayerClick={(player) => {
               // Find the original player object
               const originalPlayer = players.find(p => String(p.id) === String(player.id));

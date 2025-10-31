@@ -1,4 +1,4 @@
-from ultralytics import YOLO
+from ultralytics import x``
 import supervision as sv
 import pickle
 import os

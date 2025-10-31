@@ -96,7 +96,7 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
     const topPlayersUnsorted = [...players]
         .sort((a, b) => b.stats.rating - a.stats.rating)
         .slice(0, 11);
-    
+
     // Organize by position: Goalkeeper -> Defenders -> Midfielders -> Forwards
     const getPositionPriority = (pos: string) => {
         const posLower = pos.toLowerCase();
@@ -106,7 +106,7 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
         if (posLower.includes('forward') || posLower.includes('striker') || posLower.includes('winger')) return 3;
         return 4;
     };
-    
+
     const topPlayers = [...topPlayersUnsorted]
         .sort((a, b) => {
             const posA = getPositionPriority(a.position);
@@ -130,7 +130,7 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
             // Check if player has custom position
             const customPos = customPositions.get(player.id);
             const defaultPos = positions[index] || { x: 50, y: 50 };
-            
+
             return {
                 player,
                 position: customPos || defaultPos,
@@ -489,18 +489,18 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
                 </div>
 
                 {/* Right Side: Player List */}
-                <div className="space-y-4">
+                <div className="flex flex-col" style={{ aspectRatio: '3/4' }}>
                     <div
-                        className="bg-white border-4 p-4"
+                        className="bg-white border-4 p-4 flex flex-col h-full"
                         style={{ borderColor: theme.accent }}
                     >
                         {/* Formation Selector in Team Roster */}
                         <div className="flex items-center justify-between mb-4">
-                            <h3 
-                                style={{ 
-                                    fontSize: '1.25rem', 
-                                    fontWeight: 800, 
-                                    color: theme.secondary 
+                            <h3
+                                style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: 800,
+                                    color: theme.secondary
                                 }}
                             >
                                 Team Roster
@@ -544,12 +544,12 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
                                 )}
                             </div>
                         </div>
-                        <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                        <div className="space-y-2 flex-1 overflow-y-auto">
                             {topPlayers.map((player, index) => (
                                 <div
                                     key={player.id}
                                     className="w-full flex items-center gap-3 p-3 border-2 transition-all hover:scale-105 hover:shadow-md"
-                                    style={{ 
+                                    style={{
                                         borderColor: '#e5e5e5',
                                         backgroundColor: 'white',
                                     }}
@@ -582,9 +582,9 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
 
                                     {/* Player Info */}
                                     <div className="flex-1 text-left min-w-0">
-                                        <div 
-                                            style={{ 
-                                                fontWeight: 800, 
+                                        <div
+                                            style={{
+                                                fontWeight: 800,
                                                 fontSize: '0.9375rem',
                                                 color: '#000',
                                                 whiteSpace: 'nowrap',
@@ -594,9 +594,9 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
                                         >
                                             {player.name}
                                         </div>
-                                        <div 
-                                            style={{ 
-                                                fontSize: '0.75rem', 
+                                        <div
+                                            style={{
+                                                fontSize: '0.75rem',
                                                 color: '#666',
                                             }}
                                         >
@@ -607,57 +607,57 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
                                     {/* Stats */}
                                     <div className="flex-shrink-0 flex gap-3">
                                         <div className="text-center">
-                                            <div 
-                                                style={{ 
-                                                    fontWeight: 800, 
+                                            <div
+                                                style={{
+                                                    fontWeight: 800,
                                                     color: theme.primary,
                                                     fontSize: '0.875rem',
                                                 }}
                                             >
                                                 {player.stats.rating}
                                             </div>
-                                            <div 
-                                                style={{ 
-                                                    fontSize: '0.625rem', 
-                                                    color: '#999' 
+                                            <div
+                                                style={{
+                                                    fontSize: '0.625rem',
+                                                    color: '#999'
                                                 }}
                                             >
                                                 Rating
                                             </div>
                                         </div>
                                         <div className="text-center">
-                                            <div 
-                                                style={{ 
-                                                    fontWeight: 800, 
+                                            <div
+                                                style={{
+                                                    fontWeight: 800,
                                                     color: theme.accent,
                                                     fontSize: '0.875rem',
                                                 }}
                                             >
                                                 {player.stats.goals}
                                             </div>
-                                            <div 
-                                                style={{ 
-                                                    fontSize: '0.625rem', 
-                                                    color: '#999' 
+                                            <div
+                                                style={{
+                                                    fontSize: '0.625rem',
+                                                    color: '#999'
                                                 }}
                                             >
                                                 Goals
                                             </div>
                                         </div>
                                         <div className="text-center">
-                                            <div 
-                                                style={{ 
-                                                    fontWeight: 800, 
+                                            <div
+                                                style={{
+                                                    fontWeight: 800,
                                                     color: '#FF6B35',
                                                     fontSize: '0.875rem',
                                                 }}
                                             >
                                                 {player.stats.assists}
                                             </div>
-                                            <div 
-                                                style={{ 
-                                                    fontSize: '0.625rem', 
-                                                    color: '#999' 
+                                            <div
+                                                style={{
+                                                    fontSize: '0.625rem',
+                                                    color: '#999'
                                                 }}
                                             >
                                                 Assists
@@ -665,7 +665,7 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
                                         </div>
                                     </div>
                                     </button>
-                                    
+
                                     {/* Checkbox for multi-select */}
                                     <input
                                         type="checkbox"
@@ -685,7 +685,7 @@ export const TeamLineup = ({ players, onPlayerClick, onAddPlayer }: TeamLineupPr
             {/* Player Detail Modal */}
             <Dialog open={selectedPlayer !== null} onOpenChange={() => setSelectedPlayer(null)}>
                 <DialogContent
-                    className="bg-white border-4 max-w-md"
+                    className="bg-white border-4 max-w-md !translate-x-[-50%] !translate-y-[-50%]"
                     style={{ borderColor: theme.accent }}
                 >
                     {selectedPlayer && (
